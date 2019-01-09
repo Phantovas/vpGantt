@@ -51,21 +51,21 @@ implementation
 procedure TForm1.Button1Click(Sender: TObject);
 begin
   GanttDiagram.Height := 200;
-  Debug('Button1Click');
+  Debug('TForm1.Button1Click');
   LogBoundsRect(GanttDiagram);
   LogClientRect(GanttDiagram);
 end;
 
 procedure TForm1.ChBFlatChange(Sender: TObject);
 begin
-  Debug('ChBFlatChange');
+  Debug('TForm1.ChBFlatChange');
   LogBoundsRect(GanttDiagram);
   LogClientRect(GanttDiagram);
 end;
 
 procedure TForm1.ChBStyleChange(Sender: TObject);
 begin
-  Debug('ChBStyleChange');
+  Debug('TForm1.ChBStyleChange');
   LogBoundsRect(GanttDiagram);
   LogClientRect(GanttDiagram);
 end;
@@ -94,7 +94,7 @@ begin
   GanttDiagram.Width := 500;
   GanttDiagram.Height := 300;
   GanttDiagram.ScrollBars := ssBoth;
-  Debug(Format('RowHeight %d', [GanttDiagram.RowHeight]));
+  Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   for i:=0 to 25 do
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
@@ -104,6 +104,7 @@ begin
       //GInterval.Visible := True;
       GanttDiagram.AddInterval(GInterval);
     end;
+  GanttDiagram.TaskTitleCaption := 'Проекты';
   GanttDiagram.First;
   GanttDiagram.SetFocus;
 
