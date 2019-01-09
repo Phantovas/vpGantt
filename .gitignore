@@ -1,0 +1,6 @@
+# игнорировать все файлы в каталоге build/
+backup/
+lib/
+units/backup/
+ganttest.exe
+event.log
