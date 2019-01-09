@@ -21,6 +21,9 @@ type
     Label1: TLabel;
     ListBox1: TListBox;
     Memo1: TMemo;
+    Panel1: TPanel;
+    Panel2: TPanel;
+    Splitter1: TSplitter;
     StringGrid1: TStringGrid;
     procedure Button1Click(Sender: TObject);
     procedure ChBFlatChange(Sender: TObject);
@@ -50,7 +53,6 @@ implementation
 
 procedure TForm1.Button1Click(Sender: TObject);
 begin
-  GanttDiagram.Height := 200;
   Debug('TForm1.Button1Click');
   LogBoundsRect(GanttDiagram);
   LogClientRect(GanttDiagram);

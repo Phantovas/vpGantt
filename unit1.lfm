@@ -50,14 +50,6 @@ object Form1: TForm1
     ScrollBars = ssAutoBoth
     TabOrder = 3
   end
-  object StringGrid1: TStringGrid
-    Left = 664
-    Height = 232
-    Top = 448
-    Width = 376
-    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goRangeSelect, goDrawFocusSelected, goSmoothScroll]
-    TabOrder = 4
-  end
   object ListBox1: TListBox
     Left = 672
     Height = 144
@@ -75,7 +67,7 @@ object Form1: TForm1
       'Отправляем груз в согласованные с заказчиком сроки.'
     )
     ItemHeight = 15
-    TabOrder = 5
+    TabOrder = 4
   end
   object Label1: TLabel
     Left = 928
@@ -84,6 +76,39 @@ object Form1: TForm1
     Width = 34
     Caption = 'Label1'
     ParentColor = False
+  end
+  object Panel1: TPanel
+    Left = 672
+    Height = 248
+    Top = 440
+    Width = 368
+    Caption = 'Panel1'
+    ClientHeight = 248
+    ClientWidth = 368
+    TabOrder = 5
+    object Panel2: TPanel
+      Left = 1
+      Height = 246
+      Top = 1
+      Width = 98
+      Align = alLeft
+      Caption = 'Panel2'
+      TabOrder = 0
+    end
+    object Splitter1: TSplitter
+      Left = 99
+      Height = 246
+      Top = 1
+      Width = 5
+    end
+    object StringGrid1: TStringGrid
+      Left = 104
+      Height = 246
+      Top = 1
+      Width = 263
+      Align = alClient
+      TabOrder = 2
+    end
   end
   object EL: TEventLog
     AppendContent = False
