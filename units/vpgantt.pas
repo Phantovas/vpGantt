@@ -9,7 +9,7 @@ interface
 
 uses
   LCLproc, LCLIntf, LCLType, LMessages, SysUtils, Classes, Controls,
-  Graphics, StdCtrls, Forms, ExtCtrls, Math,
+  Graphics, StdCtrls, Forms, ExtCtrls, Math, dateutils,
   //temp
   Dialogs;
 
@@ -23,21 +23,35 @@ const
 
 type
   TTitleStyle = (tsLazarus, tsStandard, tsNative);
-  TvpgOption = (vpgDrawFocusSelected, vpgFocusHighlight, vpgRowHighlight);
+
+  TvpgOption = (vpgDrawFocusSelected,
+                vpgFocusHighlight,
+                vpgRowHighlight);
+
   TvpGanttOptions = set of TvpgOption;
 
-  //tsMinute - минуты,
-  //tsDecMinute - десятки минут (10..60),
-  //tsHour - часы,
-  //tsDay - дни,
-  //tsWeek - недели (дата.год),
-  //tsWeekNum - номер недели,
-  //tsWeekNumPlain - название недели,
-  //tsMonth - месяцы,
-  //tsQuarter - кварталы,
-  //tsHalfYear - полугодие,
-  //tsYear - год
-  TTimeScale = (tsMinute, tsDecMinute, tsHour, tsDay, tsWeek, tsWeekNum, tsWeekNumPlain, tsMonth, tsQuarter, tsHalfYear, tsYear);
+  //vptsMinute - минуты,
+  //vptsDecMinute - десятки минут (10..60),
+  //vptsHour - часы,
+  //vptsDay - дни,
+  //vptsWeek - недели (дата.год),
+  //vptsWeekNum - номер недели,
+  //vptsWeekNumPlain - название недели,
+  //vptsMonth - месяцы,
+  //vptsQuarter - кварталы,
+  //vptsHalfYear - полугодие,
+  //vptsYear - год
+  TvpTimeScale = (vptsMinute,
+                  vptsDecMinute,
+                  vptsHour,
+                  vptsDay,
+                  vptsWeek,
+                  vptsWeekNum,
+                  vptsWeekNumPlain,
+                  vptsMonth,
+                  vptsQuarter,
+                  vptsHalfYear,
+                  vptsYear);
 
 const
   SCROLL_PAGE_DEFAULT = 100;
@@ -47,10 +61,17 @@ const
 
 resourcestring
   RS_TITLE_TASKS = 'Задача';
+  //Scale
   RS_E_MAJORSCALE_HIGH = 'MajorScale should by higher than MinorScale';
   RS_E_MAJORSCALE_DIFF = 'MajorScale should by different from MinorScale';
   RS_E_MINORSCALE_HIGH = 'MinorScale should by lower than MajorScale';
   RS_E_MINORSCALE_DIFF = 'MinorScale should by different from MajorScale';
+  //Time
+  RS_E_STARTDATE_HIGH = 'Start date should by lower than end date';
+  RS_E_ENDDATE_HIGH = 'End date should by lower than start date';
+  //date
+  RS_KW = 'KW';
+
 
 type
   TvpGantt = class;
@@ -166,6 +187,7 @@ type
     protected
       procedure CreateParams(var Params: TCreateParams); override;
       procedure ClearCanvas;
+      procedure DrawBackgroundTitle;
       procedure DrawEdges;
       procedure DrawMajorScale;
       procedure DrawMinorScale;
@@ -197,8 +219,10 @@ type
       FScrollBars: TScrollStyle;
 
       FIntervals: TList;
-      FMajorScale: TTimeScale;
-      FMinorScale: TTimeScale;
+      FMajorScale: TvpTimeScale;
+      FMinorScale: TvpTimeScale;
+      FStartDate: TDateTime;
+      FEndDate: TDateTime;
 
       FUpdateCount: integer;
 
@@ -223,15 +247,17 @@ type
       function GetTaskTitleCaption: TCaption;
       procedure OnTitleFontChanged(Sender: TObject);
       function OptionsIsStored: Boolean;
+      procedure SetEndDate(AValue: TDate);
       procedure SetFocusColor(AValue: TColor);
-      procedure SetMajorScale(AValue: TTimeScale);
+      procedure SetMajorScale(AValue: TvpTimeScale);
       procedure SetMajorScaleHeight(AValue: integer);
-      procedure SetMinorScale(AValue: TTimeScale);
+      procedure SetMinorScale(AValue: TvpTimeScale);
       procedure SetMinorScaleHeight(AValue: integer);
       procedure SetOptions(AValue: TvpGanttOptions);
       procedure SetRowHeight(AValue: integer);
       procedure SetBorderWidth(AValue: integer);
       procedure SetBorderColor(AValue: TColor);
+      procedure SetStartDate(AValue: TDate);
       procedure SetTaskColor(AValue: TColor);
       procedure SetCalendarColor(AValue: TColor);
       procedure SetScrollBars(const AValue: TScrollStyle);
@@ -284,13 +310,23 @@ type
       property TitleFont: TFont read FTitleFont write SetTitleFont;
       property TitleStyle: TTitleStyle read FTitleStyle write SetTitleStyle;
       property Options: TvpGanttOptions read FvpGanttOptions write SetOptions stored OptionsIsStored default DefaultGanttOptions;
-      property MajorScale: TTimeScale read FMajorScale write SetMajorScale default tsMonth;
-      property MinorScale: TTimeScale read FMinorScale write SetMinorScale default tsDay;
+      property MajorScale: TvpTimeScale read FMajorScale write SetMajorScale default vptsMonth;
+      property MinorScale: TvpTimeScale read FMinorScale write SetMinorScale default vptsDay;
+      property StartDate: TDate read FStartDate write SetStartDate;
+      property EndDate: TDate read FEndDate write SetEndDate;
+
   end;
 
+  //draw
   procedure DrawRubberRect(Canvas: TCanvas; aRect: TRect; Color: TColor);
   function  GetWorkingCanvas(const Canvas: TCanvas): TCanvas;
   procedure FreeWorkingCanvas(canvas: TCanvas);
+  //timescale
+  function UnitsBetweenDates(Start, Finish: TdateTime; TimeScale: TvpTimeScale): Double;
+  function GetTimeScaleName(TimeScale: TvpTimeScale; D: TDateTime): String;
+  function IncTime(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Integer): TDateTime;
+  function IncTimeEx(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Double): TDateTime;
+  function ClearToPeriodStart(MinorScale: TvpTimeScale; D: TDateTime): TDateTime;
 
 implementation
 
@@ -363,6 +399,516 @@ procedure FreeWorkingCanvas(canvas: TCanvas);
 begin
   ReleaseDC(0, Canvas.Handle);
   Canvas.Free;
+end;
+
+function UnitsBetweenDates(Start, Finish: TDateTime; TimeScale: TvpTimeScale): Double;
+var
+  StartStamp, FinishStamp: TTimeStamp;
+  StartDay, StartMonth, StartYear: Word;
+  FinishDay, FinishMonth, FinishYear: Word;
+begin
+  StartStamp := DateTimeToTimeStamp(Start);
+  FinishStamp := DateTimeToTimeStamp(Finish);
+
+  DecodeDate(Start, StartYear, StartMonth, StartDay);
+  DecodeDate(Finish, FinishYear, FinishMonth, FinishDay);
+
+  case TimeScale of
+    vptsMinute:
+      begin
+        Result :=
+          (FinishStamp.Time / 1000 / 60 + FinishStamp.Date * 24 * 60) -
+          (StartStamp.Time / 1000 / 60 + StartStamp.Date * 24 * 60);
+      end;
+    vptsDecMinute:
+      begin
+        Result :=
+          (FinishStamp.Time / 1000 / 60 + FinishStamp.Date * 24 * 60) -
+          (StartStamp.Time / 1000 / 60 + StartStamp.Date * 24 * 60);
+      end;
+    vptsHour:
+      begin
+        Result :=
+          (FinishStamp.Time / 1000 / 60 / 60 + FinishStamp.Date * 24) -
+          (StartStamp.Time / 1000 / 60 / 60 + StartStamp.Date * 24);
+      end;
+    vptsDay:
+      begin
+        Result :=
+          (FinishStamp.Time / 1000 / 60 / 60 / 24 + FinishStamp.Date) -
+          (StartStamp.Time / 1000 / 60 / 60 / 24 + StartStamp.Date);
+      end;
+    vptsWeek,vptsWeekNum,vptsWeekNumPlain:
+      begin
+        Result :=
+          (FinishStamp.Time / 1000 / 60 / 60 / 24 / 7 + FinishStamp.Date / 7) -
+          (StartStamp.Time / 1000 / 60 / 60 / 24 / 7 + StartStamp.Date / 7);
+      end;
+    vptsMonth:
+      begin
+        Result :=
+          (
+            FinishMonth
+              +
+            (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
+              /
+            MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+          )
+            -
+          (
+            StartMonth
+              +
+            (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
+              /
+            MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+          )
+            +
+          (FinishYear - StartYear)
+            *
+          12;
+      end;
+    vptsQuarter:
+      begin
+        Result :=
+          (
+            (
+              FinishMonth
+                +
+              (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
+                /
+              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            )
+              -
+            (
+              StartMonth
+                +
+              (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
+                /
+              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            )
+          )
+            /
+          3
+            +
+          (FinishYear - StartYear)
+            *
+          3;
+      end;
+    vptsHalfYear:
+      begin
+        Result :=
+          (
+            (
+              FinishMonth
+                +
+              (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
+                /
+              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            )
+              -
+            (
+              StartMonth
+                +
+              (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
+                /
+              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            )
+          )
+            /
+          6
+            +
+          (FinishYear - StartYear)
+            *
+          6;
+      end;
+    vptsYear:
+      begin
+        Result :=
+          (
+            (
+              FinishMonth
+                +
+              (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
+                /
+              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            )
+              -
+            (
+              StartMonth
+                +
+              (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
+                /
+              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            )
+            /
+            12
+          )
+            +
+          (FinishYear - StartYear);
+      end;
+    else
+      begin
+        Result :=
+          FinishStamp.Time / 1000 + FinishStamp.Date * 24 * 60 * 60 -
+          StartStamp.Time / 1000 + StartStamp.Date * 24 * 60 * 60;
+      end;
+  end;
+end;
+
+function GetTimeScaleName(TimeScale: TvpTimeScale; D: TDateTime): String;
+var
+  Hour, Min, Sec, MSec: Word;
+  Year, Month, Day: Word;
+begin
+  DecodeDate(D, Year, Month, Day);
+  DecodeTime(D, Hour, Min, Sec, MSec);
+
+  case TimeScale of
+    vptsMinute:
+      begin
+        Result := IntToStr(Min);
+      end;
+    vptsDecMinute:
+      begin
+        Result := IntToStr(Min);
+      end;
+    vptsHour:
+      begin
+        Result := IntToStr(Hour);
+      end;
+    vptsDay:
+      begin
+        Result := ShortDayNames[DayOfWeek(D)];
+      end;
+    vptsWeek:
+      begin
+        Result := IntToStr(Day) + '.' + IntToStr(Month);
+      end;
+    vptsWeekNum:
+      begin
+        Result := RS_KW + IntToStr(WeekOfTheYear(D));
+      end;
+    vptsWeekNumPlain:
+      begin
+        Result := IntToStr(WeekOfTheYear(D));
+      end;
+    vptsMonth:
+      begin
+        Result := ShortMonthNames[Month];
+      end;
+    vptsQuarter:
+      begin
+        Result := IntToStr((Month) div 3 + 1);
+      end;
+    vptsHalfYear:
+      begin
+        Result := IntToStr((Month) div 6 + 1);
+      end;
+    vptsYear:
+      begin
+        Result := IntToStr(Year);
+      end;
+  end;
+end;
+
+function IncTime(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Integer
+  ): TDateTime;
+var
+  S: TTimeStamp;
+begin
+  S := DateTimeToTimeStamp(D);
+
+  case TimeScale of
+    vptsMinute:
+    begin
+      if IncAmount > 24 * 60 then
+      begin
+        Inc(S.Date, IncAmount div 24 * 60);
+        IncAmount := IncAmount - IncAmount div (24 * 60) * (24 * 60);
+      end;
+
+      Inc(S.Time, IncAmount * 60 * 1000);
+      while S.Time < 0 do
+      begin
+        Dec(S.Date);
+        S.Time := MSecsPerDay + S.Time;
+      end;
+    end;
+    vptsHour:
+    begin
+      if IncAmount > 24 then
+      begin
+        Inc(S.Date, IncAmount div 24);
+        IncAmount := IncAmount - IncAmount div 24 * 24;
+      end;
+
+      Inc(S.Time, IncAmount * 60 * 60 * 1000);
+      while S.Time < 0 do
+      begin
+        Dec(S.Date);
+        S.Time := MSecsPerDay + S.Time;
+      end;
+    end;
+    vptsDay:
+    begin
+      Inc(S.Date, IncAmount);
+    end;
+    vptsWeek,vptsWeekNum,vptsWeekNumPlain:
+    begin
+      Inc(S.Date, IncAmount * 7);
+    end;
+    vptsMonth:
+    begin
+      S := DateTimeToTimeStamp(IncMonth(D, IncAmount));
+    end;
+    vptsQuarter:
+    begin
+      S := DateTimeToTimeStamp(IncMonth(D, IncAmount * 3));
+    end;
+    vptsHalfYear:
+    begin
+      S := DateTimeToTimeStamp(IncMonth(D, IncAmount * 6));
+    end;
+    vptsYear:
+    begin
+      S := DateTimeToTimeStamp(IncMonth(D, IncAmount * 12));
+    end;
+    else begin
+      if IncAmount > 24 * 60 * 60 then
+      begin
+        Inc(S.Date, IncAmount div 24 * 60 * 60);
+        IncAmount := IncAmount - IncAmount div 24 * 60 * 60;
+      end;
+
+      Inc(S.Time, IncAmount * 1000);
+      while S.Time < 0 do
+      begin
+        Dec(S.Date);
+        S.Time := MSecsPerDay + S.Time;
+      end;
+    end;
+  end;
+
+  Result := TimeStampToDateTime(S);
+end;
+
+function IncTimeEx(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Double): TDateTime;
+var
+  S: TTimeStamp;
+  Year, Month, Day: Word;
+begin
+  S := DateTimeToTimeStamp(D);
+
+  case TimeScale of
+    vptsMinute:
+    begin
+      if IncAmount > 24 * 60 then
+      begin
+        Inc(S.Date, Trunc(IncAmount / 24 * 60));
+        IncAmount := IncAmount - Trunc(IncAmount / 24 * 60) * (24 * 60);
+      end;
+
+      Inc(S.Time, Trunc(IncAmount * 60 * 1000));
+
+      while S.Time < 0 do
+      begin
+        Dec(S.Date);
+        S.Time := MSecsPerDay + S.Time;
+      end;
+    end;
+    vptsHour:
+    begin
+      if IncAmount > 24 then
+      begin
+        Inc(S.Date, Trunc(IncAmount / 24));
+        IncAmount := IncAmount - Trunc(IncAmount / 24) * 24;
+      end;
+
+      Inc(S.Time, Trunc(IncAmount * 60 * 60 * 1000));
+
+      while S.Time < 0 do
+      begin
+        Dec(S.Date);
+        S.Time := MSecsPerDay + S.Time;
+      end;
+    end;
+    vptsDay:
+    begin
+      Inc(S.Date, Trunc(IncAmount));
+
+      S :=
+        DateTimeToTimeStamp
+        (
+          IncTimeEx
+          (
+            TimeStampToDateTime(S), vptsHour, Frac(IncAmount) * 24
+          )
+        );
+    end;
+    vptsWeek,vptsWeekNum,vptsWeekNumPlain:
+    begin
+      Inc(S.Date, Trunc(IncAmount) * 7);
+
+      S :=
+        DateTimeToTimeStamp
+        (
+          IncTimeEx
+          (
+            TimeStampToDateTime(S), vptsDay, Frac(IncAmount) * 7
+          )
+        );
+    end;
+    vptsMonth:
+    begin
+      S := DateTimeToTimeStamp(IncMonth(D, Trunc(IncAmount)));
+      DecodeDate(TimeStampToDateTime(S), Year, Month, Day);
+
+      S :=
+        DateTimeToTimeStamp
+        (
+          IncTimeEx
+          (
+            TimeStampToDateTime(S), vptsDay,
+            Frac(IncAmount) * MonthDays[IsLeapYear(Year)][Month]
+          )
+        );
+    end;
+    vptsQuarter:
+    begin
+      S := DateTimeToTimeStamp(IncMonth(D, Trunc(IncAmount) * 3));
+
+      S :=
+        DateTimeToTimeStamp
+        (
+          IncTimeEx
+          (
+            TimeStampToDateTime(S), vptsMonth, Frac(IncAmount) * 3
+          )
+        );
+    end;
+    vptsHalfYear:
+    begin
+      S := DateTimeToTimeStamp(IncMonth(D, Trunc(IncAmount) * 6));
+
+      S :=
+        DateTimeToTimeStamp
+        (
+          IncTimeEx
+          (
+            TimeStampToDateTime(S), vptsMonth, Frac(IncAmount) * 6
+          )
+        );
+    end;
+    vptsYear:
+    begin
+      S := DateTimeToTimeStamp(IncMonth(D, Trunc(IncAmount) * 12));
+
+      S :=
+        DateTimeToTimeStamp
+        (
+          IncTimeEx
+          (
+            TimeStampToDateTime(S), vptsMonth, Frac(IncAmount) * 12
+          )
+        );
+    end;
+    else begin
+      if IncAmount > 24 * 60 * 60 then
+      begin
+        Inc(S.Date, Trunc(IncAmount / 24 * 60 * 60));
+        IncAmount := IncAmount - IncAmount / 24 * 60 * 60;
+      end;
+
+      Inc(S.Time, Trunc(IncAmount * 1000));
+      while S.Time < 0 do
+      begin
+        Dec(S.Date);
+        S.Time := MSecsPerDay + S.Time;
+      end;
+    end;
+  end;
+
+  Result := TimeStampToDateTime(S);
+end;
+
+
+function ClearToPeriodStart(MinorScale: TvpTimeScale; D: TDateTime): TDateTime;
+var
+  S: TTimeStamp;
+  Year, Month, Day: Word;
+begin
+  S := DateTimeToTimeStamp(D);
+  DecodeDate(D, Year, Month, Day);
+
+  case MinorScale of
+    vptsMinute:
+    begin
+      S.Time := (S.Time div (60 * 1000)) * (60 * 1000);
+    end;
+    vptsHour:
+    begin
+      S.Time := (S.Time div (60 * 60 * 1000)) * (60 * 60 * 1000);
+    end;
+    vptsDay:
+    begin
+      S.Time := 0;
+    end;
+    vptsWeek,vptsWeekNum,vptsWeekNumPlain:
+    begin
+      S.Date := (S.Date div 7) * 7 + 1;
+      S.Time := 0;
+    end;
+    vptsMonth:
+    begin
+      Day := 1;
+      D := EncodeDate(Year, Month, Day);
+      S := DateTimeToTimeStamp(D);
+      S.Time := 0;
+    end;
+    vptsQuarter:
+    begin
+      Day := 1;
+      Month := (Month div 3) * 3 + 1;
+
+      if Month > 12 then
+      begin
+        Month := 1;
+        Inc(Year);
+      end;
+
+      D := EncodeDate(Year, Month, Day);
+      S := DateTimeToTimeStamp(D);
+      S.Time := 0;
+    end;
+    vptsHalfYear:
+    begin
+      Day := 1;
+      Month := (Month div 6) * 6 + 1;
+
+      if Month > 12 then
+      begin
+        Month := 1;
+        Inc(Year);
+      end;
+
+      D := EncodeDate(Year, Month, Day);
+      S := DateTimeToTimeStamp(D);
+      S.Time := 0;
+    end;
+    vptsYear:
+    begin
+      Day := 1;
+      Month := 1;
+      D := EncodeDate(Year, Month, Day);
+      S := DateTimeToTimeStamp(D);
+      S.Time := 0;
+    end;
+    else begin
+      S.Time := (S.Time div 1000) * 1000;
+    end;
+  end;
+
+  Result := TimeStampToDateTime(S);
 end;
 
 
@@ -491,8 +1037,9 @@ procedure TvpGanttCalendar.WMSize(var Message: TLMSize);
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.WMSize');
+  Form1.EL.Debug('IsResizing %d', [Integer(IsResizing)]);
   {$endif}
-  if not Self.IsResizing then
+  if not IsResizing then
     begin
       UpdateSizes;
       inherited;
@@ -662,6 +1209,22 @@ begin
   Canvas.Rectangle(ClientRect);
 end;
 
+procedure TvpGanttCalendar.DrawBackgroundTitle;
+var
+  aRect: TRect;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.DrawEdges');
+  {$endif}
+  UnionRect(aRect, FMajorScaleTitleRect, FMinorScaleTitleRect);
+  //clear canvas
+  Canvas.Brush.Color := FvpGantt.FTitleColor;
+  Canvas.FillRect(aRect);
+  Canvas.Pen.Style := psSolid;
+  Canvas.Pen.Color := clActiveBorder;
+  Canvas.Rectangle(aRect);
+end;
+
 procedure TvpGanttCalendar.DrawMajorScale;
 var
   aRect: TRect;
@@ -672,14 +1235,10 @@ begin
   aRect := FMajorScaleTitleRect;
   //titRect := GetTitleRect;
   //titCaption := PChar(FvpGantt.TaskTitleCaption);
-  //заливаем
-  Canvas.Brush.Color := FvpGantt.TitleColor;
-  Canvas.Brush.Style := bsSolid;
-  Canvas.FillRect(aRect);
   //рисуем границу
   Canvas.Pen.Style := psSolid;
   Canvas.Pen.Color := clActiveBorder;
-  Canvas.Rectangle(aRect);
+  Canvas.Line(aRect.Left, aRect.Bottom, aRect.Right, aRect.Bottom);
 end;
 
 procedure TvpGanttCalendar.DrawMinorScale;
@@ -692,14 +1251,7 @@ begin
   aRect := FMinorScaleTitleRect;
   //titRect := GetTitleRect;
   //titCaption := PChar(FvpGantt.TaskTitleCaption);
-  //заливаем
-  Canvas.Brush.Color := FvpGantt.TitleColor;
-  Canvas.Brush.Style := bsSolid;
-  Canvas.FillRect(aRect);
-  //рисуем границу
-  Canvas.Pen.Style := psSolid;
-  Canvas.Pen.Color := clActiveBorder;
-  Canvas.Rectangle(aRect);
+  //границу не рисуем, т.к. разделение нарисуем в старшей шкале
 end;
 
 procedure TvpGanttCalendar.GetSBVisibility(out HsbVisible, VsbVisible: boolean);
@@ -768,6 +1320,7 @@ begin
   {$endif}
   ClearCanvas;
   DrawEdges;
+  DrawBackgroundTitle;
   DrawMajorScale;
   DrawMinorScale;
 end;
@@ -1432,6 +1985,33 @@ begin
   Result := FvpGanttOptions <> DefaultGanttOptions;
 end;
 
+procedure TvpGantt.SetEndDate(AValue: TDate);
+var
+  aDT: TDateTime;
+  aYear, aMonth, ADay: word;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.SetEndDate');
+  {$endif}
+  //декодируем в числа и получаем конец дня
+  DecodeDate(AValue, aYear, aMonth, ADay);
+  aDT := EndOfADay(aYear, aMonth, ADay);
+  if FEndDate = aDT then
+    Exit;
+  if csReading in ComponentState then
+    FEndDate := aDT
+  else if aDT<FStartDate then
+    raise Exception.Create(RS_E_ENDDATE_HIGH)
+  else
+    begin
+      FEndDate := aDT;
+      VisualChange;
+    end;
+  {$ifdef DBGGANTT}
+  Form1.Debug('End date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FEndDate));
+  {$endif}
+end;
+
 procedure TvpGantt.SetFocusColor(AValue: TColor);
 begin
   {$ifdef DBGGANTT}
@@ -1442,7 +2022,7 @@ begin
   //TODO Сделать обновление области с фокусом
 end;
 
-procedure TvpGantt.SetMajorScale(AValue: TTimeScale);
+procedure TvpGantt.SetMajorScale(AValue: TvpTimeScale);
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetMajorScale');
@@ -1458,7 +2038,7 @@ begin
   else
     begin
       FMajorScale := AValue;
-      Invalidate;
+      VisualChange;
     end;
 end;
 
@@ -1472,7 +2052,7 @@ begin
   VisualChange;
 end;
 
-procedure TvpGantt.SetMinorScale(AValue: TTimeScale);
+procedure TvpGantt.SetMinorScale(AValue: TvpTimeScale);
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetMinorScale');
@@ -1488,7 +2068,7 @@ begin
   else
     begin
       FMinorScale := AValue;
-      Invalidate;
+      VisualChange;
     end;
 end;
 
@@ -1542,6 +2122,33 @@ begin
     Exit;
   FBorderColor := AValue;
   VisualChange;
+end;
+
+procedure TvpGantt.SetStartDate(AValue: TDate);
+var
+  aDT: TDateTime;
+  aYear, aMonth, ADay: word;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.SetStartDate');
+  {$endif}
+  //декодируем в числа и получаем конец дня
+  DecodeDate(AValue, aYear, aMonth, ADay);
+  aDT := StartOfADay(aYear, aMonth, ADay);
+  if FStartDate = aDT then
+    Exit;
+  if csReading in ComponentState then
+    FStartDate := aDT
+  else if aDT<FEndDate then
+    raise Exception.Create(RS_E_STARTDATE_HIGH)
+  else
+    begin
+      FStartDate := aDT;
+      VisualChange;
+    end;
+  {$ifdef DBGGANTT}
+  Form1.Debug('Start date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FEndDate));
+  {$endif}
 end;
 
 procedure TvpGantt.SetTaskColor(AValue: TColor);
@@ -1774,7 +2381,7 @@ begin
   //create splitter
   FSplitter := TSplitter.Create(Self);
   InsertControl(FSplitter);
-  FSplitter.ResizeStyle := rsPattern;
+  //FSplitter.ResizeStyle := rsPattern;
   FSplitter.Left := FvpGanttTasks.Left + FvpGanttTasks.Width + 1;
   FSplitter.Align := alLeft;
   FSplitter.Width := C_DEFAULT_SPLITTER_WIDTH;
@@ -1785,9 +2392,6 @@ begin
   FvpGanttCalendar.Align := alClient;
 
   BeginUpdate;
-
-  MajorScale := tsMonth;
-  MinorScale := tsDay;
 
   Options := DefaultGanttOptions;
 
@@ -1814,6 +2418,11 @@ begin
   FFocusColor := clBlack;
 
   TaskTitleCaption := RS_TITLE_TASKS;
+
+  MajorScale := vptsMonth;
+  MinorScale := vptsDay;
+  StartDate := Now;
+  EndDate := Now;
 
   EndUpdate();
 end;

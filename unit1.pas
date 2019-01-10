@@ -7,7 +7,7 @@ interface
 uses
   Classes, SysUtils, FileUtil,
   Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls, Grids, vpGantt,
-  gsGanttCalendar, eventlog;
+  eventlog;
 
 type
 
@@ -43,7 +43,7 @@ type
 var
   Form1: TForm1;
   GanttDiagram: TvpGantt;
-  GC: TgsGantt;
+  //GC: TgsGantt;
 
 implementation
 
@@ -54,8 +54,19 @@ implementation
 procedure TForm1.Button1Click(Sender: TObject);
 begin
   Debug('TForm1.Button1Click');
-  LogBoundsRect(GanttDiagram);
-  LogClientRect(GanttDiagram);
+  Memo1.Lines.Add(TimeToStr(Time));
+  Memo1.Lines.Add(Format('%f', [Time]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsMinute)]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsDecMinute)]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsHour)]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsDay)]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsWeek)]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsWeekNum)]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsWeekNumPlain)]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsMonth)]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsQuarter)]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsHalfYear)]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsYear)]));
 end;
 
 procedure TForm1.ChBFlatChange(Sender: TObject);
@@ -76,7 +87,7 @@ procedure TForm1.FormClose(Sender: TObject; var CloseAction: TCloseAction);
 begin
   try
   finally
-    GC.Free;
+    //GC.Free;
     GanttDiagram.Free;
   end;
 end;
@@ -84,7 +95,7 @@ end;
 procedure TForm1.FormShow(Sender: TObject);
 var
   i, j: integer;
-  LInterval: TInterval;
+  //LInterval: TInterval;
   GInterval: TvpInterval;
 begin
   EL.Active := True;
@@ -110,34 +121,34 @@ begin
   GanttDiagram.First;
   GanttDiagram.SetFocus;
 
-  GC :=  TgsGantt.Create(Self);
-  GC.Parent := Self;
-  GC.Left := 0;
-  GC.Top := 0;
-  GC.Width:= 500;
-  GC.Height:= 200;
-  GC.Tree.Font.Color := clRed;
-  GC.Calendar.StartDate:= Now;
-  GC.Calendar.MinorScale := tsMinute;
-  GC.Calendar.MajorScale:= tsHour;
-  for i:=0 to 5 do
-    begin
-      Linterval := TInterval.Create(GC);
-      //LInterval.Name := 'aa' + IntToStr(i) ;
-      LInterval.StartDate := Now + i/60/60*i + 1;
-      LInterval.FinishDate := Now + i/60/60*i + 2;
-      LInterval.Visible := True;
-      GC.AddInterval(LInterval);
-      GC.Tree.Cells[0,i + 1] := IntToStr(i);
-      for j:=0 to 3 do
-        begin
-          Linterval := TInterval.Create(GC);
-          //LInterval.Name := 'bbbbbb ' + IntToStr(j);
-          LInterval.StartDate := Now + i/60/60*i + j/60/60;
-          LInterval.FinishDate := Now + i/60/60*i + j/60/60  + 1;
-          GC.Interval[i].AddInterval(LInterval);
-        end;
-    end;
+  //GC :=  TgsGantt.Create(Self);
+  //GC.Parent := Self;
+  //GC.Left := 0;
+  //GC.Top := 0;
+  //GC.Width:= 500;
+  //GC.Height:= 200;
+  //GC.Tree.Font.Color := clRed;
+  //GC.Calendar.StartDate:= Now;
+  //GC.Calendar.MinorScale := tsMinute;
+  //GC.Calendar.MajorScale:= tsHour;
+  //for i:=0 to 5 do
+  //  begin
+  //    Linterval := TInterval.Create(GC);
+  //    //LInterval.Name := 'aa' + IntToStr(i) ;
+  //    LInterval.StartDate := Now + i/60/60*i + 1;
+  //    LInterval.FinishDate := Now + i/60/60*i + 2;
+  //    LInterval.Visible := True;
+  //    GC.AddInterval(LInterval);
+  //    GC.Tree.Cells[0,i + 1] := IntToStr(i);
+  //    for j:=0 to 3 do
+  //      begin
+  //        Linterval := TInterval.Create(GC);
+  //        //LInterval.Name := 'bbbbbb ' + IntToStr(j);
+  //        LInterval.StartDate := Now + i/60/60*i + j/60/60;
+  //        LInterval.FinishDate := Now + i/60/60*i + j/60/60  + 1;
+  //        GC.Interval[i].AddInterval(LInterval);
+  //      end;
+  //  end;
 end;
 
 procedure TForm1.Debug(AMessage: string; AShowMessage: boolean);

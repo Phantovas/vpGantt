@@ -640,37 +640,37 @@ function GetTimeScaleUnits(TimeScale: TTimeScale; Year, Month: Integer): Integer
 begin
   case TimeScale of
     tsMinute:
-    begin
-      Result := 60;
-    end;
+      begin
+        Result := 60;
+      end;
     tsHour:
-    begin
-      Result := 60;
-    end;
+      begin
+        Result := 60;
+      end;
     tsDay:
-    begin
-      Result := 24;
-    end;
+      begin
+        Result := 24;
+      end;
     tsWeek,tsWeekNum,tsWeekNumPlain:
-    begin
-      Result := 7;
-    end;
+      begin
+        Result := 7;
+      end;
     tsMonth:
-    begin
-      Result := MonthDays[IsLeapYear(Year)][Month];
-    end;
+      begin
+        Result := MonthDays[IsLeapYear(Year)][Month];
+      end;
     tsQuarter:
-    begin
-      Result := 3;
-    end;
+      begin
+        Result := 3;
+      end;
     tsHalfYear:
-    begin
-      Result := 2;
-    end;
+      begin
+        Result := 2;
+      end;
     tsYear:
-    begin
-      Result := 2;
-    end;
+      begin
+        Result := 2;
+      end;
     else
       Result := 60;
   end;
