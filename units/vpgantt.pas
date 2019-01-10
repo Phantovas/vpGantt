@@ -70,7 +70,7 @@ resourcestring
   RS_E_STARTDATE_HIGH = 'Start date should by lower than end date';
   RS_E_ENDDATE_HIGH = 'End date should by lower than start date';
   //date
-  RS_KW = 'KW';
+  RS_KW = 'Кв. ';
 
 
 type
@@ -229,7 +229,7 @@ type
       FRowHeight: integer;
       FMajorScaleHeight: integer;
       FMinorScaleHeight: integer;
-      FBorderWidth: integer;
+      FGanttBorderWidth: integer;
       FBorderColor: TColor;
       FTaskColor: TColor;
       FTitleColor: TColor;
@@ -255,7 +255,7 @@ type
       procedure SetMinorScaleHeight(AValue: integer);
       procedure SetOptions(AValue: TvpGanttOptions);
       procedure SetRowHeight(AValue: integer);
-      procedure SetBorderWidth(AValue: integer);
+      procedure SetGanttBorderWidth(AValue: integer);
       procedure SetBorderColor(AValue: TColor);
       procedure SetStartDate(AValue: TDate);
       procedure SetTaskColor(AValue: TColor);
@@ -296,8 +296,13 @@ type
       procedure MoveTo(ARow: integer);
       property FocusColor: TColor read FFocusColor write SetFocusColor default clBlack;
     published
+      //standart TwinControl property
+      property Align;
+      property BorderStyle;
+      property BorderWidth;
+      //custom property
+      property GanttBorderWidth: Integer read FGanttBorderWidth write SetGanttBorderWidth default 1;
       property RowHeight: integer read FRowHeight write SetRowHeight default 20;
-      property BorderWidth: Integer read FBorderWidth write SetBorderWidth default 1;
       property BorderColor: TColor read FBorderColor write SetBorderColor default clActiveBorder;
       //TODO Move this properties to child control OR stay this HOW RULES?
       property TaskColor: TColor read FTaskColor write SetTaskColor default clWindow;
@@ -314,7 +319,6 @@ type
       property MinorScale: TvpTimeScale read FMinorScale write SetMinorScale default vptsDay;
       property StartDate: TDate read FStartDate write SetStartDate;
       property EndDate: TDate read FEndDate write SetEndDate;
-
   end;
 
   //draw
@@ -423,8 +427,8 @@ begin
     vptsDecMinute:
       begin
         Result :=
-          (FinishStamp.Time / 1000 / 60 + FinishStamp.Date * 24 * 60) -
-          (StartStamp.Time / 1000 / 60 + StartStamp.Date * 24 * 60);
+          ((FinishStamp.Time / 1000 / 60  + FinishStamp.Date * 24 * 60) -
+          (StartStamp.Time / 1000 / 600  + StartStamp.Date * 24 * 60)) / 10;
       end;
     vptsHour:
       begin
@@ -2102,14 +2106,14 @@ begin
   VisualChange;
 end;
 
-procedure TvpGantt.SetBorderWidth(AValue: integer);
+procedure TvpGantt.SetGanttBorderWidth(AValue: integer);
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetBorderWidth');
   {$endif}
-  if FBorderWidth = AValue then
+  if FGanttBorderWidth = AValue then
     Exit;
-  FBorderWidth := AValue;
+  FGanttBorderWidth := AValue;
   VisualChange;
 end;
 
@@ -2267,8 +2271,8 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.GetBorderWidth');
   {$endif}
-  if FBorderWidth > 0 then
-    Result := FBorderWidth
+  if FGanttBorderWidth > 0 then
+    Result := FGanttBorderWidth
   else
     Result := 0;
 end;
@@ -2398,7 +2402,7 @@ begin
   Width := C_VPGANTT_WIDTH;
   Height := C_VPGANTT_HEIGHT;
 
-  BorderWidth := C_DEFAULT_BORDER_WIDTH;
+  GanttBorderWidth := C_DEFAULT_BORDER_WIDTH;
   TitleColor := clBtnFace;
   TaskColor := clWindow;
   CalendarColor := clWindow;

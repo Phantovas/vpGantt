@@ -7,7 +7,7 @@ interface
 uses
   Classes, SysUtils, FileUtil,
   Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls, Grids, vpGantt,
-  eventlog;
+  eventlog, dateutils;
 
 type
 
@@ -54,9 +54,12 @@ implementation
 procedure TForm1.Button1Click(Sender: TObject);
 begin
   Debug('TForm1.Button1Click');
-  Memo1.Lines.Add(TimeToStr(Time));
-  Memo1.Lines.Add(Format('%f', [Time]));
+  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', GanttDiagram.StartDate));
+  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', GanttDiagram.EndDate));
+  Memo1.Lines.Add(Format('%d', [DateTimeToTimeStamp(GanttDiagram.StartDate).DAte]));
+  Memo1.Lines.Add(Format('%d', [DateTimeToTimeStamp(GanttDiagram.EndDate).Date]));
   Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsMinute)]));
+  Memo1.Lines.Add(Format('%d', [MinutesBetween(GanttDiagram.StartDate, GanttDiagram.EndDate)]));
   Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsDecMinute)]));
   Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsHour)]));
   Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsDay)]));
@@ -107,18 +110,20 @@ begin
   GanttDiagram.Width := 500;
   GanttDiagram.Height := 300;
   GanttDiagram.ScrollBars := ssBoth;
+  GanttDiagram.BorderStyle := bsSingle;
+  GanttDiagram.TaskTitleCaption := 'Проекты';
   Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   for i:=0 to 25 do
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
-      GInterval.Name := 'aaassadsfsdfgdsfgdsgsdfgdfsdfsdffffffffffffffffffffffffffffffffffffffffffffff' + IntToStr(i) ;
+      GInterval.Name := 'aaassadsfsdfgdsfgdsgsdfgdfsdfsdaaassadsfsdfgdsfgdsgsdfgdfsdfsdaaassads  ' + IntToStr(i) ;
       GInterval.StartDate := Now + i/60/60*i + 1;
       //GInterval.FinishDate := Now + i/60/60*i + 2;
       //GInterval.Visible := True;
       GanttDiagram.AddInterval(GInterval);
     end;
-  GanttDiagram.TaskTitleCaption := 'Проекты';
   GanttDiagram.First;
+  GanttDiagram.EndDate := Now;
   GanttDiagram.SetFocus;
 
   //GC :=  TgsGantt.Create(Self);
