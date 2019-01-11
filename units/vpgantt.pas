@@ -62,10 +62,10 @@ const
 resourcestring
   RS_TITLE_TASKS = 'Задача';
   //Scale
-  RS_E_MAJORSCALE_HIGH = 'MajorScale should by higher than MinorScale';
-  RS_E_MAJORSCALE_DIFF = 'MajorScale should by different from MinorScale';
-  RS_E_MINORSCALE_HIGH = 'MinorScale should by lower than MajorScale';
-  RS_E_MINORSCALE_DIFF = 'MinorScale should by different from MajorScale';
+  //RS_E_MAJORSCALE_HIGH = 'MajorScale should by higher than MinorScale';
+  //RS_E_MAJORSCALE_DIFF = 'MajorScale should by different from MinorScale';
+  //RS_E_MINORSCALE_HIGH = 'MinorScale should by lower than MajorScale';
+  //RS_E_MINORSCALE_DIFF = 'MinorScale should by different from MajorScale';
   //Time
   RS_E_STARTDATE_HIGH = 'Start date should by lower than end date';
   RS_E_ENDDATE_HIGH = 'End date should by lower than start date';
@@ -249,9 +249,8 @@ type
       function OptionsIsStored: Boolean;
       procedure SetEndDate(AValue: TDate);
       procedure SetFocusColor(AValue: TColor);
-      procedure SetMajorScale(AValue: TvpTimeScale);
+      procedure SetScale(AValue: TvpTimeScale);
       procedure SetMajorScaleHeight(AValue: integer);
-      procedure SetMinorScale(AValue: TvpTimeScale);
       procedure SetMinorScaleHeight(AValue: integer);
       procedure SetOptions(AValue: TvpGanttOptions);
       procedure SetRowHeight(AValue: integer);
@@ -315,8 +314,7 @@ type
       property TitleFont: TFont read FTitleFont write SetTitleFont;
       property TitleStyle: TTitleStyle read FTitleStyle write SetTitleStyle;
       property Options: TvpGanttOptions read FvpGanttOptions write SetOptions stored OptionsIsStored default DefaultGanttOptions;
-      property MajorScale: TvpTimeScale read FMajorScale write SetMajorScale default vptsMonth;
-      property MinorScale: TvpTimeScale read FMinorScale write SetMinorScale default vptsDay;
+      property Scale: TvpTimeScale read FMinorScale write SetScale default vptsDay;
       property StartDate: TDate read FStartDate write SetStartDate;
       property EndDate: TDate read FEndDate write SetEndDate;
   end;
@@ -967,11 +965,12 @@ begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.GetMajorScaleRect');
   {$endif}
+  //большая шкала
   FMajorScaleTitleRect := ClientRect;
   FMajorScaleTitleRect.Bottom := FvpGantt.MajorScaleHeight;
+  //маленькая шкала
   FMinorScaleTitleRect := ClientRect;
-  //с поправкой на 1 пиксель, чтобы не получалась жирной строка между шкалами
-  FMinorScaleTitleRect.Top := FvpGantt.MajorScaleHeight - 1;
+  FMinorScaleTitleRect.Top := FvpGantt.MajorScaleHeight;
   FMinorScaleTitleRect.Bottom := FvpGantt.MajorScaleHeight + FvpGantt.MinorScaleHeight;
 end;
 
@@ -1224,6 +1223,7 @@ begin
   //clear canvas
   Canvas.Brush.Color := FvpGantt.FTitleColor;
   Canvas.FillRect(aRect);
+  //рисуем ободок
   Canvas.Pen.Style := psSolid;
   Canvas.Pen.Color := clActiveBorder;
   Canvas.Rectangle(aRect);
@@ -1239,10 +1239,6 @@ begin
   aRect := FMajorScaleTitleRect;
   //titRect := GetTitleRect;
   //titCaption := PChar(FvpGantt.TaskTitleCaption);
-  //рисуем границу
-  Canvas.Pen.Style := psSolid;
-  Canvas.Pen.Color := clActiveBorder;
-  Canvas.Line(aRect.Left, aRect.Bottom, aRect.Right, aRect.Bottom);
 end;
 
 procedure TvpGanttCalendar.DrawMinorScale;
@@ -1255,7 +1251,10 @@ begin
   aRect := FMinorScaleTitleRect;
   //titRect := GetTitleRect;
   //titCaption := PChar(FvpGantt.TaskTitleCaption);
-  //границу не рисуем, т.к. разделение нарисуем в старшей шкале
+  //рисуем границу
+  Canvas.Pen.Style := psSolid;
+  Canvas.Pen.Color := clActiveBorder;
+  Canvas.Line(aRect.Left, aRect.Top, aRect.Right, aRect.Top);
 end;
 
 procedure TvpGanttCalendar.GetSBVisibility(out HsbVisible, VsbVisible: boolean);
@@ -2026,26 +2025,6 @@ begin
   //TODO Сделать обновление области с фокусом
 end;
 
-procedure TvpGantt.SetMajorScale(AValue: TvpTimeScale);
-begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetMajorScale');
-  {$endif}
-  if FMajorScale = AValue then
-    Exit;
-  if csReading in ComponentState then
-    FMajorScale := AValue
-  else if AValue < MinorScale then
-    raise Exception.Create(RS_E_MAJORSCALE_HIGH)
-  else if AValue = MinorScale then
-    raise Exception.Create(RS_E_MAJORSCALE_DIFF)
-  else
-    begin
-      FMajorScale := AValue;
-      VisualChange;
-    end;
-end;
-
 procedure TvpGantt.SetMajorScaleHeight(AValue: integer);
 begin
   {$ifdef DBGGANTT}
@@ -2056,24 +2035,20 @@ begin
   VisualChange;
 end;
 
-procedure TvpGantt.SetMinorScale(AValue: TvpTimeScale);
+procedure TvpGantt.SetScale(AValue: TvpTimeScale);
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetMinorScale');
   {$endif}
   if FMinorScale = AValue then
     Exit;
-  if csReading in ComponentState then
-    FMinorScale := AValue
-  else if AValue > MajorScale then
-    raise Exception.Create(RS_E_MINORSCALE_HIGH)
-  else if AValue = MajorScale then
-    raise Exception.Create(RS_E_MINORSCALE_DIFF)
+  FMinorScale := AValue;
+  if FMinorScale <> vptsYear then
+    FMajorScale := Succ(AValue)
   else
-    begin
-      FMinorScale := AValue;
-      VisualChange;
-    end;
+    SetMajorScaleHeight(0);
+  if not (csReading in ComponentState) then
+    VisualChange;
 end;
 
 procedure TvpGantt.SetMinorScaleHeight(AValue: integer);
@@ -2423,8 +2398,7 @@ begin
 
   TaskTitleCaption := RS_TITLE_TASKS;
 
-  MajorScale := vptsMonth;
-  MinorScale := vptsDay;
+  Scale := vptsDay;
   StartDate := Now;
   EndDate := Now;
 

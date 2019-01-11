@@ -69,7 +69,9 @@ begin
   Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsMonth)]));
   Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsQuarter)]));
   Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsHalfYear)]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsYear)]));
+  Memo1.Lines.Add('ClearToPeriodStart');
+  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', ClearToPeriodStart(Succ(vptsHalfYear), GanttDiagram.EndDate + 1)));
+
 end;
 
 procedure TForm1.ChBFlatChange(Sender: TObject);
@@ -123,6 +125,7 @@ begin
       GanttDiagram.AddInterval(GInterval);
     end;
   GanttDiagram.First;
+  //GanttDiagram.Scale := vptsYear;
   GanttDiagram.EndDate := Now;
   GanttDiagram.SetFocus;
 
