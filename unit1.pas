@@ -114,6 +114,7 @@ begin
   GanttDiagram.ScrollBars := ssBoth;
   GanttDiagram.BorderStyle := bsSingle;
   GanttDiagram.TaskTitleCaption := 'Проекты';
+  GanttDiagram.TitleStyle := tsStandard;
   Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   for i:=0 to 25 do
     begin

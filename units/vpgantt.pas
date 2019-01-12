@@ -9,7 +9,7 @@ interface
 
 uses
   LCLproc, LCLIntf, LCLType, LMessages, SysUtils, Classes, Controls,
-  Graphics, StdCtrls, Forms, ExtCtrls, Math, dateutils,
+  Graphics, StdCtrls, Forms, ExtCtrls, Math, dateutils, Themes,
   //temp
   Dialogs;
 
@@ -271,6 +271,9 @@ type
       function GetFocusRow: integer;
       function GetRowPosY(const YPos: integer): integer;
       function GetTitleHeight: integer;
+      procedure DrawThemedCell(ACanvas: TCanvas; aRect: TRect);
+      procedure DrawFillRect(ACanvas:TCanvas; aRect: TRect);
+      procedure DrawTitleGrid(ACanvas: TCanvas; aRect: TRect);
       procedure FontChanged(Sender: TObject); override;
       procedure Paint; override;
       procedure SetFocusRow(AValue: integer);
@@ -970,7 +973,7 @@ begin
   FMajorScaleTitleRect.Bottom := FvpGantt.MajorScaleHeight;
   //маленькая шкала
   FMinorScaleTitleRect := ClientRect;
-  FMinorScaleTitleRect.Top := FvpGantt.MajorScaleHeight;
+  FMinorScaleTitleRect.Top := FvpGantt.MajorScaleHeight + 1;
   FMinorScaleTitleRect.Bottom := FvpGantt.MajorScaleHeight + FvpGantt.MinorScaleHeight;
 end;
 
@@ -1222,11 +1225,7 @@ begin
   UnionRect(aRect, FMajorScaleTitleRect, FMinorScaleTitleRect);
   //clear canvas
   Canvas.Brush.Color := FvpGantt.FTitleColor;
-  Canvas.FillRect(aRect);
-  //рисуем ободок
-  Canvas.Pen.Style := psSolid;
-  Canvas.Pen.Color := clActiveBorder;
-  Canvas.Rectangle(aRect);
+  FvpGantt.DrawFillRect(Canvas, aRect);
 end;
 
 procedure TvpGanttCalendar.DrawMajorScale;
@@ -1237,6 +1236,17 @@ begin
   Form1.Debug('TvpGanttCalendar.DrawMajorScale');
   {$endif}
   aRect := FMajorScaleTitleRect;
+  if FvpGantt.TitleStyle = tsNative then
+    FvpGantt.DrawThemedCell(Canvas, aRect)
+  else
+    begin
+      //заливаем
+      Canvas.Brush.Style := bsSolid;
+      Canvas.Brush.Color := FvpGantt.TitleColor;
+      FvpGantt.DrawFillRect(Canvas, aRect);
+    end;
+  //граница
+  FvpGantt.DrawTitleGrid(Canvas, aRect);
   //titRect := GetTitleRect;
   //titCaption := PChar(FvpGantt.TaskTitleCaption);
 end;
@@ -1249,12 +1259,23 @@ begin
   Form1.Debug('TvpGanttCalendar.DrawMinorScale');
   {$endif}
   aRect := FMinorScaleTitleRect;
+  if FvpGantt.TitleStyle = tsNative then
+    FvpGantt.DrawThemedCell(Canvas, aRect)
+  else
+    begin
+      //заливаем
+      Canvas.Brush.Style := bsSolid;
+      Canvas.Brush.Color := FvpGantt.TitleColor;
+      FvpGantt.DrawFillRect(Canvas, aRect);
+    end;
+  //граница
+  FvpGantt.DrawTitleGrid(Canvas, aRect);
   //titRect := GetTitleRect;
   //titCaption := PChar(FvpGantt.TaskTitleCaption);
-  //рисуем границу
-  Canvas.Pen.Style := psSolid;
-  Canvas.Pen.Color := clActiveBorder;
-  Canvas.Line(aRect.Left, aRect.Top, aRect.Right, aRect.Top);
+  ////рисуем границу
+  //Canvas.Pen.Style := psSolid;
+  //Canvas.Pen.Color := clActiveBorder;
+  //Canvas.Line(aRect.Left, aRect.Top, aRect.Right, aRect.Top);
 end;
 
 procedure TvpGanttCalendar.GetSBVisibility(out HsbVisible, VsbVisible: boolean);
@@ -1459,7 +1480,8 @@ begin
   {$endif}
   aRect.Left := 0;
   aRect.Right := Min(aRect.Right, ClientWidth);
-  InflateRect(aRect, -1, 0);
+  inc(aRect.Left);
+  //InflateRect(aRect, -1, 0);
   inc(aRect.Top, 1);
 end;
 
@@ -1625,14 +1647,17 @@ begin
   {$endif}
   titRect := GetTitleRect;
   titCaption := PChar(FvpGantt.TaskTitleCaption);
-  //заливаем
-  Canvas.Brush.Style := bsSolid;
-  Canvas.Brush.Color := FvpGantt.TitleColor;
-  Canvas.FillRect(titRect);
-  //рисуем границу
-  Canvas.Pen.Style := psSolid;
-  Canvas.Pen.Color := clActiveBorder;
-  Canvas.Rectangle(titRect);
+  if FvpGantt.TitleStyle = tsNative then
+    FvpGantt.DrawThemedCell(Canvas, titRect)
+  else
+    begin
+      //заливаем
+      Canvas.Brush.Style := bsSolid;
+      Canvas.Brush.Color := FvpGantt.TitleColor;
+      FvpGantt.DrawFillRect(Canvas, titRect);
+    end;
+  //граница
+  FvpGantt.DrawTitleGrid(Canvas, titRect);
   //пишем текст
   if Assigned(FvpGantt) then
     Canvas.Font.Assign(FvpGantt.TitleFont)
@@ -2532,6 +2557,61 @@ begin
   if not Assigned(FvpGanttTasks) then
     Result := -1;
   Result := FMajorScaleHeight + FMinorScaleHeight;
+end;
+
+procedure TvpGantt.DrawThemedCell(ACanvas: TCanvas; aRect: TRect);
+var
+  details: TThemedElementDetails;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.DrawThemedCell');
+  {$endif}
+  //if gdPushed in aState then
+  //  Details := ThemeServices.GetElementDetails(thHeaderItemPressed)
+  //else if gdHot in aState then
+  //  Details := ThemeServices.GetElementDetails(thHeaderItemHot)
+  //else
+    Details := ThemeServices.GetElementDetails(thHeaderItemNormal);
+  ThemeServices.DrawElement(ACanvas.Handle, Details, aRect, nil);
+end;
+
+procedure TvpGantt.DrawFillRect(ACanvas: TCanvas; aRect: TRect);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.DrawFillRect');
+  {$endif}
+  ACanvas.FillRect(aRect);
+end;
+
+procedure TvpGantt.DrawTitleGrid(ACanvas: TCanvas; aRect: TRect);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.DrawTitleGrid');
+  {$endif}
+  if FGanttBorderWidth>0 then
+    begin
+      //не рисуем обводку, если у нас используются стили
+      if FTitleStyle = tsNative then
+        Exit;
+      ACanvas.Pen.Style := psSolid;
+      ACanvas.Pen.Color := cl3DHilight;
+      ACanvas.MoveTo(aRect.Right - 1, aRect.Top);
+      ACanvas.LineTo(aRect.Left, aRect.Top);
+      ACanvas.LineTo(aRect.Left, aRect.Bottom - 1);
+      //если не используем tsStandart то будем рисовать рамку цветом cl3DShadow
+      ACanvas.Pen.Color := cl3DShadow;
+      if FTitleStyle = tsStandard then
+        begin
+          ACanvas.MoveTo(aRect.Left + 1, aRect.Bottom - 1);
+          ACanvas.LineTo(aRect.Right - 2, aRect.Bottom - 1);
+          ACanvas.LineTo(aRect.Right - 2, aRect.Top + 1);
+          //Иначе внешний цвет деаем темнее
+          ACanvas.Pen.Color := cl3DDKShadow;
+        end;
+      ACanvas.MoveTo(aRect.Left, aRect.Bottom);
+      ACanvas.LineTo(aRect.Right - 1, aRect.Bottom);
+      ACanvas.LineTo(aRect.Right - 1, aRect.Top);
+    end;
 end;
 
 

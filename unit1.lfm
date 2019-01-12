@@ -108,6 +108,7 @@ object Form1: TForm1
       Width = 263
       Align = alClient
       TabOrder = 2
+      TitleStyle = tsNative
     end
   end
   object EL: TEventLog
