@@ -59,10 +59,13 @@ begin
   Memo1.Lines.Add(Format('%d', [DateTimeToTimeStamp(GanttDiagram.StartDate).DAte]));
   Memo1.Lines.Add(Format('%d', [DateTimeToTimeStamp(GanttDiagram.EndDate).Date]));
   Memo1.Lines.Add(Format('%f', [UnitsBetweenDatesEx(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsMinute)]));
-  Memo1.Lines.Add(Format('%d', [MinutesBetween(GanttDiagram.StartDate, GanttDiagram.EndDate)]));
+  Memo1.Lines.Add(Format('%f', [MinuteSpan(GanttDiagram.StartDate, GanttDiagram.EndDate)]));
   Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', StartOfADay(2019, 1, 1)));
   Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', EndOfAYear(2019)));
   Memo1.Lines.Add(Format('%f', [YearSpan(StartOfADay(2019, 1, 1), EndOfAYear(2019))]));
+  Memo1.Lines.Add(Format('%d', [WeekOfTheYear(GanttDiagram.StartDate)]));
+  Memo1.Lines.Add(Format('%d', [WeekOfTheYear(GanttDiagram.EndDate)]));
+
 end;
 
 procedure TForm1.ChBFlatChange(Sender: TObject);
@@ -105,6 +108,8 @@ begin
   GanttDiagram.ScrollBars := ssBoth;
   GanttDiagram.BorderStyle := bsSingle;
   GanttDiagram.TaskTitleCaption := 'Проекты';
+  GanttDiagram.MinorScale := vptsHour;
+  GanttDiagram.MajorScale := vptsDay;
   //GanttDiagram.TitleStyle := tsStandard;
   Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   for i:=0 to 25 do
@@ -112,7 +117,7 @@ begin
       GInterval := TvpInterval.Create(GanttDiagram);
       GInterval.Name := 'aaassadsfsdfgdsfgdsgsdfgdfsdfsdaaassadsfsdfgdsfgdsgsdfgdfsdfsdaaassads  ' + IntToStr(i) ;
       GInterval.StartDate := Now + i/60/60*i + 1;
-      //GInterval.FinishDate := Now + i/60/60*i + 2;
+      GInterval.DueDate := Now + i/60/60*i + 2;
       //GInterval.Visible := True;
       GanttDiagram.AddInterval(GInterval);
     end;

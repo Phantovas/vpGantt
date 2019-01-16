@@ -70,6 +70,7 @@ resourcestring
   RS_E_STARTDATE_HIGH = 'Start date should by lower than end date';
   RS_E_ENDDATE_HIGH = 'End date should by lower than start date';
   //date
+  RS_WEEK = 'Нед. ';
   RS_KW = 'Кв. ';
 
 
@@ -339,7 +340,6 @@ type
   function GetTimeScaleName(TimeScale: TvpTimeScale; D: TDateTime): String;
   function IncTime(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Integer): TDateTime;
   function IncTimeEx(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Double): TDateTime;
-  function ClearToPeriodStart(MinorScale: TvpTimeScale; D: TDateTime): TDateTime;
 
 implementation
 
@@ -358,6 +358,15 @@ begin
 end;
 {$endif}
 
+{
+  Процедура прорисовки квадратика активного фокуса в окне.
+  Взято из модуля Grids, почему не используется функция WinAPI DrawFocusRect могу только догадыватся.
+  И это скорее всего связано с кроссплатформенностью, данный компонент ее не поддерживает, надеюсь пока.
+  А функция уже реализована, потому будем юзать её.
+  @param Canvas TCanvas канва на которой рисуем
+  @param aRect TRect область фокуса для отрисовки
+  @color TColor цвет прямоугольника
+}
 procedure DrawRubberRect(Canvas: TCanvas; aRect: TRect; Color: TColor);
   procedure DrawVertLine(X1,Y1,Y2: integer);
   begin
@@ -394,6 +403,12 @@ begin
   end;
 end;
 
+{
+  Получаем рабочий канвас, если он не существует или =0 то получаем указатель
+  на рабочий стол
+  @param Canvas TCanvas нужная канва
+  @return TCanvas указатель на канву или рабочий стол
+}
 function GetWorkingCanvas(const Canvas: TCanvas): TCanvas;
 var
   DC: HDC;
@@ -408,6 +423,10 @@ begin
     Result := Canvas;
 end;
 
+{
+  Освобождаем рабочую канву
+  @param Canvas TCanvas нужная канва
+}
 procedure FreeWorkingCanvas(canvas: TCanvas);
 begin
   ReleaseDC(0, Canvas.Handle);
@@ -415,150 +434,45 @@ begin
 end;
 
 
+{
+  Функция определения количества временных интервалов между двумя датами
+  @param Start TDateTime начальное время
+  @param Finish TDateTime конечное время
+  @param TimeScale TvpTimeScale тип временной шкалы см. TvpTimeScale
+}
 function UnitsBetweenDates(Start, Finish: TDateTime; TimeScale: TvpTimeScale): Double;
 begin
-  //case TimeScale of
-  //  vptsMinute:
-  //    begin
-  //      Result :=
-  //        (FinishStamp.Time / 1000 / 60 + FinishStamp.Date * 24 * 60) -
-  //        (StartStamp.Time / 1000 / 60 + StartStamp.Date * 24 * 60);
-  //    end;
-  //  vptsDecMinute:
-  //    begin
-  //      Result :=
-  //        ((FinishStamp.Time / 1000 / 60  + FinishStamp.Date * 24 * 60) -
-  //        (StartStamp.Time / 1000 / 600  + StartStamp.Date * 24 * 60)) / 10;
-  //    end;
-  //  vptsHour:
-  //    begin
-  //      Result :=
-  //        (FinishStamp.Time / 1000 / 60 / 60 + FinishStamp.Date * 24) -
-  //        (StartStamp.Time / 1000 / 60 / 60 + StartStamp.Date * 24);
-  //    end;
-  //  vptsDay:
-  //    begin
-  //      Result :=
-  //        (FinishStamp.Time / 1000 / 60 / 60 / 24 + FinishStamp.Date) -
-  //        (StartStamp.Time / 1000 / 60 / 60 / 24 + StartStamp.Date);
-  //    end;
-  //  vptsWeek,vptsWeekNum,vptsWeekNumPlain:
-  //    begin
-  //      Result :=
-  //        (FinishStamp.Time / 1000 / 60 / 60 / 24 / 7 + FinishStamp.Date / 7) -
-  //        (StartStamp.Time / 1000 / 60 / 60 / 24 / 7 + StartStamp.Date / 7);
-  //    end;
-  //  vptsMonth:
-  //    begin
-  //      Result :=
-  //        (
-  //          FinishMonth
-  //            +
-  //          (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
-  //            /
-  //          MonthDays[IsLeapYear(FinishYear)][FinishMonth]
-  //        )
-  //          -
-  //        (
-  //          StartMonth
-  //            +
-  //          (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
-  //            /
-  //          MonthDays[IsLeapYear(FinishYear)][FinishMonth]
-  //        )
-  //          +
-  //        (FinishYear - StartYear)
-  //          *
-  //        12;
-  //    end;
-  //  vptsQuarter:
-  //    begin
-  //      Result :=
-  //        (
-  //          (
-  //            FinishMonth
-  //              +
-  //            (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
-  //              /
-  //            MonthDays[IsLeapYear(FinishYear)][FinishMonth]
-  //          )
-  //            -
-  //          (
-  //            StartMonth
-  //              +
-  //            (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
-  //              /
-  //            MonthDays[IsLeapYear(FinishYear)][FinishMonth]
-  //          )
-  //        )
-  //          /
-  //        3
-  //          +
-  //        (FinishYear - StartYear)
-  //          *
-  //        3;
-  //    end;
-  //  vptsHalfYear:
-  //    begin
-  //      Result :=
-  //        (
-  //          (
-  //            FinishMonth
-  //              +
-  //            (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
-  //              /
-  //            MonthDays[IsLeapYear(FinishYear)][FinishMonth]
-  //          )
-  //            -
-  //          (
-  //            StartMonth
-  //              +
-  //            (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
-  //              /
-  //            MonthDays[IsLeapYear(FinishYear)][FinishMonth]
-  //          )
-  //        )
-  //          /
-  //        6
-  //          +
-  //        (FinishYear - StartYear)
-  //          *
-  //        6;
-  //    end;
-  //  vptsYear:
-  //    begin
-  //      Result :=
-  //        (
-  //          (
-  //            FinishMonth
-  //              +
-  //            (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
-  //              /
-  //            MonthDays[IsLeapYear(FinishYear)][FinishMonth]
-  //          )
-  //            -
-  //          (
-  //            StartMonth
-  //              +
-  //            (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
-  //              /
-  //            MonthDays[IsLeapYear(FinishYear)][FinishMonth]
-  //          )
-  //          /
-  //          12
-  //        )
-  //          +
-  //        (FinishYear - StartYear);
-  //    end;
-  //  else
-  //    begin
-  //      Result :=
-  //        FinishStamp.Time / 1000 + FinishStamp.Date * 24 * 60 * 60 -
-  //        StartStamp.Time / 1000 + StartStamp.Date * 24 * 60 * 60;
-  //    end;
-  //end;
+  case TimeScale of
+    vptsMinute:
+      Result := MinuteSpan(Start, Finish);
+    vptsDecMinute:
+      Result := MinuteSpan(Start, Finish)/10;
+    vptsHour:
+      Result := HourSpan(Start, Finish)/10;
+    vptsDay:
+      Result := DaySpan(Start, Finish);
+    vptsWeek, vptsWeekNum, vptsWeekNumPlain:
+      Result := WeekSpan(Start, Finish);
+    vptsMonth:
+      Result := MonthSpan(Start, Finish);
+    vptsQuarter:
+      Result := MonthSpan(Start, Finish)/3;
+    vptsHalfYear:
+      Result := MonthSpan(Start, Finish)/6;
+    vptsYear:
+      Result := YearSpan(Start, Finish);
+    else
+      Result := DaySpan(Start, Finish);
+  end;
 end;
 
+{
+  Функция определения количества временных интервалов между двумя датами с
+  использованием приведения времени к юниксовскому формату
+  @param Start TDateTime начальное время
+  @param Finish TDateTime конечное время
+  @param TimeScale TvpTimeScale тип временной шкалы см. TvpTimeScale
+}
 function UnitsBetweenDatesEx(Start, Finish: TDateTime; TimeScale: TvpTimeScale): Double;
 var
   StartStamp, FinishStamp: TTimeStamp;
@@ -605,101 +519,57 @@ begin
     vptsMonth:
       begin
         Result :=
-          (
-            FinishMonth
-              +
-            (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
-              /
-            MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+          (FinishMonth +
+            (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24) / MonthDays[IsLeapYear(FinishYear)][FinishMonth]
           )
             -
-          (
-            StartMonth
-              +
-            (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
-              /
-            MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+          (StartMonth +
+            (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24) / MonthDays[IsLeapYear(FinishYear)][FinishMonth]
           )
             +
-          (FinishYear - StartYear)
-            *
-          12;
+          (FinishYear - StartYear) * 12;
       end;
     vptsQuarter:
       begin
         Result :=
           (
-            (
-              FinishMonth
-                +
-              (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
-                /
-              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            (FinishMonth +
+              (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24) / MonthDays[IsLeapYear(FinishYear)][FinishMonth]
             )
               -
-            (
-              StartMonth
-                +
-              (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
-                /
-              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            (StartMonth +
+              (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24) / MonthDays[IsLeapYear(FinishYear)][FinishMonth]
             )
-          )
-            /
-          3
+          ) / 3
             +
-          (FinishYear - StartYear)
-            *
-          3;
+          (FinishYear - StartYear) * 3;
       end;
     vptsHalfYear:
       begin
         Result :=
           (
-            (
-              FinishMonth
-                +
-              (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
-                /
-              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            (FinishMonth +
+              (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24) / MonthDays[IsLeapYear(FinishYear)][FinishMonth]
             )
               -
-            (
-              StartMonth
-                +
-              (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
-                /
-              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            (StartMonth +
+              (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24) / MonthDays[IsLeapYear(FinishYear)][FinishMonth]
             )
-          )
-            /
-          6
+          ) / 6
             +
-          (FinishYear - StartYear)
-            *
-          6;
+          (FinishYear - StartYear) * 6;
       end;
     vptsYear:
       begin
         Result :=
           (
-            (
-              FinishMonth
-                +
-              (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24)
-                /
-              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            (FinishMonth +
+              (FinishDay + FinishStamp.Time / 1000 / 60 / 60 / 24) / MonthDays[IsLeapYear(FinishYear)][FinishMonth]
             )
               -
-            (
-              StartMonth
-                +
-              (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24)
-                /
-              MonthDays[IsLeapYear(FinishYear)][FinishMonth]
-            )
-            /
-            12
+            (StartMonth +
+              (StartDay + StartStamp.Time / 1000 / 60 / 60 / 24) / MonthDays[IsLeapYear(FinishYear)][FinishMonth]
+            ) / 12
           )
             +
           (FinishYear - StartYear);
@@ -713,6 +583,12 @@ begin
   end;
 end;
 
+{
+  Функция возвращает название временной шкалы
+  @param TimeScale TvpTimeScale тип временной шкалы
+  @param D TDateTime время
+  @return string название временного интервала (Пн. Вт, Январь, Ферваль, и т.д.)
+}
 function GetTimeScaleName(TimeScale: TvpTimeScale; D: TDateTime): String;
 var
   Hour, Min, Sec, MSec: Word;
@@ -728,7 +604,7 @@ begin
       end;
     vptsDecMinute:
       begin
-        Result := IntToStr(Min);
+        Result := IntToStr(Min*10);
       end;
     vptsHour:
       begin
@@ -744,7 +620,7 @@ begin
       end;
     vptsWeekNum:
       begin
-        Result := RS_KW + IntToStr(WeekOfTheYear(D));
+        Result := RS_WEEK + IntToStr(WeekOfTheYear(D));
       end;
     vptsWeekNumPlain:
       begin
@@ -756,7 +632,7 @@ begin
       end;
     vptsQuarter:
       begin
-        Result := IntToStr((Month) div 3 + 1);
+        Result := RS_KW + IntToStr((Month) div 3 + 1);
       end;
     vptsHalfYear:
       begin
@@ -769,85 +645,43 @@ begin
   end;
 end;
 
-function IncTime(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Integer
-  ): TDateTime;
-var
-  S: TTimeStamp;
+{
+  Функция сдвига времени на нужный интервал. Будеи использовать для получения даты
+  и передачи ее в функцию получения названия текущего периода.
+  Например, стартовая дата 01.01.2000 года, диапазон старшей шкалы месяцы, значит первая дата
+  будет 01.01.2000 для нее получим название "Январь", для получения следующей даты
+  надо передать в функцию текущую дату и на сколько сдвигаем IncAmount. Сдвинем на 1 месяй и получим дату
+  01.02.2000 прочитаем его название и получим "Февраль"
+  @param D TDateTime текущее время
+  @param TimeScale TvpTimeScale шкала времени
+  @param IncAmount integer число деленний для сдвига
+  @return TDateTime полученное после сдвига время
+}
+function IncTime(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Integer): TDateTime;
 begin
-  S := DateTimeToTimeStamp(D);
-
+  Result := D;
+  if IncAmount=0 then
+    Exit;
   case TimeScale of
     vptsMinute:
-    begin
-      if IncAmount > 24 * 60 then
-      begin
-        Inc(S.Date, IncAmount div 24 * 60);
-        IncAmount := IncAmount - IncAmount div (24 * 60) * (24 * 60);
-      end;
-
-      Inc(S.Time, IncAmount * 60 * 1000);
-      while S.Time < 0 do
-      begin
-        Dec(S.Date);
-        S.Time := MSecsPerDay + S.Time;
-      end;
-    end;
+      Result := IncMinute(D, IncAmount);
+    vptsDecMinute:
+      Result := IncMinute(D, IncAmount * 10);
     vptsHour:
-    begin
-      if IncAmount > 24 then
-      begin
-        Inc(S.Date, IncAmount div 24);
-        IncAmount := IncAmount - IncAmount div 24 * 24;
-      end;
-
-      Inc(S.Time, IncAmount * 60 * 60 * 1000);
-      while S.Time < 0 do
-      begin
-        Dec(S.Date);
-        S.Time := MSecsPerDay + S.Time;
-      end;
-    end;
+      Result := IncHour(D, IncAmount);
     vptsDay:
-    begin
-      Inc(S.Date, IncAmount);
-    end;
-    vptsWeek,vptsWeekNum,vptsWeekNumPlain:
-    begin
-      Inc(S.Date, IncAmount * 7);
-    end;
+      Result := IncDay(D, IncAmount);
+    vptsWeek, vptsWeekNum, vptsWeekNumPlain:
+      Result := IncWeek(D, IncAmount);
     vptsMonth:
-    begin
-      S := DateTimeToTimeStamp(IncMonth(D, IncAmount));
-    end;
+      Result := IncMonth(D, IncAmount);
     vptsQuarter:
-    begin
-      S := DateTimeToTimeStamp(IncMonth(D, IncAmount * 3));
-    end;
+      Result := IncMonth(D, IncAmount * 3);
     vptsHalfYear:
-    begin
-      S := DateTimeToTimeStamp(IncMonth(D, IncAmount * 6));
-    end;
+      Result := IncMonth(D, IncAmount * 6);
     vptsYear:
-    begin
-      S := DateTimeToTimeStamp(IncMonth(D, IncAmount * 12));
-    end;
-    else begin
-      if IncAmount > 24 * 60 * 60 then
-      begin
-        Inc(S.Date, IncAmount div 24 * 60 * 60);
-        IncAmount := IncAmount - IncAmount div 24 * 60 * 60;
-      end;
-
-      Inc(S.Time, IncAmount * 1000);
-      while S.Time < 0 do
-      begin
-        Dec(S.Date);
-        S.Time := MSecsPerDay + S.Time;
-      end;
-    end;
+      Result := IncYear(D, IncAmount);
   end;
-
-  Result := TimeStampToDateTime(S);
 end;
 
 function IncTimeEx(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Double): TDateTime;
@@ -983,86 +817,6 @@ begin
         Dec(S.Date);
         S.Time := MSecsPerDay + S.Time;
       end;
-    end;
-  end;
-
-  Result := TimeStampToDateTime(S);
-end;
-
-
-function ClearToPeriodStart(MinorScale: TvpTimeScale; D: TDateTime): TDateTime;
-var
-  S: TTimeStamp;
-  Year, Month, Day: Word;
-begin
-  S := DateTimeToTimeStamp(D);
-  DecodeDate(D, Year, Month, Day);
-
-  case MinorScale of
-    vptsMinute:
-    begin
-      S.Time := (S.Time div (60 * 1000)) * (60 * 1000);
-    end;
-    vptsHour:
-    begin
-      S.Time := (S.Time div (60 * 60 * 1000)) * (60 * 60 * 1000);
-    end;
-    vptsDay:
-    begin
-      S.Time := 0;
-    end;
-    vptsWeek,vptsWeekNum,vptsWeekNumPlain:
-    begin
-      S.Date := (S.Date div 7) * 7 + 1;
-      S.Time := 0;
-    end;
-    vptsMonth:
-    begin
-      Day := 1;
-      D := EncodeDate(Year, Month, Day);
-      S := DateTimeToTimeStamp(D);
-      S.Time := 0;
-    end;
-    vptsQuarter:
-    begin
-      Day := 1;
-      Month := (Month div 3) * 3 + 1;
-
-      if Month > 12 then
-      begin
-        Month := 1;
-        Inc(Year);
-      end;
-
-      D := EncodeDate(Year, Month, Day);
-      S := DateTimeToTimeStamp(D);
-      S.Time := 0;
-    end;
-    vptsHalfYear:
-    begin
-      Day := 1;
-      Month := (Month div 6) * 6 + 1;
-
-      if Month > 12 then
-      begin
-        Month := 1;
-        Inc(Year);
-      end;
-
-      D := EncodeDate(Year, Month, Day);
-      S := DateTimeToTimeStamp(D);
-      S.Time := 0;
-    end;
-    vptsYear:
-    begin
-      Day := 1;
-      Month := 1;
-      D := EncodeDate(Year, Month, Day);
-      S := DateTimeToTimeStamp(D);
-      S.Time := 0;
-    end;
-    else begin
-      S.Time := (S.Time div 1000) * 1000;
     end;
   end;
 
@@ -1398,6 +1152,7 @@ end;
 procedure TvpGanttCalendar.DrawMajorScale;
 var
   aRect: TRect;
+  i: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawMajorScale');
@@ -1414,8 +1169,12 @@ begin
     end;
   //граница
   FvpGantt.DrawTitleGrid(Canvas, aRect);
-  //titRect := GetTitleRect;
-  //titCaption := PChar(FvpGantt.TaskTitleCaption);
+  //рисуем названия
+  for i:=0 to FMajorScaleCount -1 do
+    begin
+      Canvas.TextRect(aRect, aRect.Left, aRect.top, GetTimeScaleName(FvpGantt.FMajorScale, IncTime(FvpGantt.StartDate, FvpGantt.FMajorScale, i)));
+      inc(aRect.Left, 20);
+    end;
 end;
 
 procedure TvpGanttCalendar.DrawMinorScale;
@@ -2242,39 +2001,30 @@ begin
       AEndDate := Max(FStartDate, AEndDate);
       DecodeDate(AEndDate, aEYear, aEMonth, aEDay);
       case FMajorScale of
-        //концом диапазона будем считать день в 00:00:00
+        //концом диапазона будем считать день в 23:59:59
         //минуты быть не могут, но возьмем и их
         vptsMinute, vptsDecMinute, vptsHour, vptsDay:
-          begin
-            FEndDate := EndOfADay(aEYear, aEMonth, aEDay);
-            FEndDate := StartOfTheDay(FEndDate + 1);
-          end;
+          FEndDate := EndOfADay(aEYear, aEMonth, aEDay);
         vptsWeek, vptsWeekNum, vptsWeekNumPlain:
-          begin
-            FEndDate := EndOfAWeek(aEYear, aEMonth, aEDay);
-            FEndDate := StartOfTheDay(FEndDate + 1);
-          end;
+          FEndDate := EndOfAWeek(aEYear, aEMonth, aEDay);
         vptsMonth:
-          begin
-            FEndDate := EndOfAMonth(aEYear, aEMonth);
-            FEndDate := StartOfTheDay(FEndDate + 1);
-          end;
+          FEndDate := EndOfAMonth(aEYear, aEMonth);
         vptsQuarter:
           begin
             case aSMonth of
-              1..3: FEndDate := StartOfAMonth(aEYear, 4);
-              4..6: FEndDate := StartOfAMonth(aEYear, 7);
-              7..9: FEndDate := StartOfAMonth(aEYear, 10);
-              10..12: FEndDate := StartOfAMonth(aEYear + 1, 1);
+              1..3: FEndDate := EndOfAMonth(aEYear, 3);
+              4..6: FEndDate := EndOfAMonth(aEYear, 6);
+              7..9: FEndDate := EndOfAMonth(aEYear, 9);
+              10..12: FEndDate := EndOfAMonth(aEYear, 12);
             end;
           end;
         vptsHalfYear:
           if aSMonth<7 then
-            FEndDate := StartOfAMonth(aEYear, 7)
+            FEndDate := EndOfAMonth(aEYear, 6)
           else
-            FEndDate := StartOfAMonth(aEYear + 1, 1);
+            FEndDate := EndOfAMonth(aEYear, 12);
         vptsYear:
-          FEndDate := StartOfAYear(aEYear + 1);
+          FEndDate := EndOfAYear(aEYear);
       end;
     end;
   {$ifdef DBGGANTT}
