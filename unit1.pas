@@ -58,20 +58,11 @@ begin
   Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', GanttDiagram.EndDate));
   Memo1.Lines.Add(Format('%d', [DateTimeToTimeStamp(GanttDiagram.StartDate).DAte]));
   Memo1.Lines.Add(Format('%d', [DateTimeToTimeStamp(GanttDiagram.EndDate).Date]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsMinute)]));
+  Memo1.Lines.Add(Format('%f', [UnitsBetweenDatesEx(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsMinute)]));
   Memo1.Lines.Add(Format('%d', [MinutesBetween(GanttDiagram.StartDate, GanttDiagram.EndDate)]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsDecMinute)]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsHour)]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsDay)]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsWeek)]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsWeekNum)]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsWeekNumPlain)]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsMonth)]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsQuarter)]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDates(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsHalfYear)]));
-  Memo1.Lines.Add('ClearToPeriodStart');
-  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', ClearToPeriodStart(Succ(vptsHalfYear), GanttDiagram.EndDate + 1)));
-
+  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', StartOfADay(2019, 1, 1)));
+  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', EndOfAYear(2019)));
+  Memo1.Lines.Add(Format('%f', [YearSpan(StartOfADay(2019, 1, 1), EndOfAYear(2019))]));
 end;
 
 procedure TForm1.ChBFlatChange(Sender: TObject);
@@ -114,7 +105,7 @@ begin
   GanttDiagram.ScrollBars := ssBoth;
   GanttDiagram.BorderStyle := bsSingle;
   GanttDiagram.TaskTitleCaption := 'Проекты';
-  GanttDiagram.TitleStyle := tsStandard;
+  //GanttDiagram.TitleStyle := tsStandard;
   Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   for i:=0 to 25 do
     begin
@@ -127,7 +118,6 @@ begin
     end;
   GanttDiagram.First;
   //GanttDiagram.Scale := vptsYear;
-  GanttDiagram.EndDate := Now;
   GanttDiagram.SetFocus;
 
   //GC :=  TgsGantt.Create(Self);
