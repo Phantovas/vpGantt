@@ -14,10 +14,11 @@ uses
   Dialogs;
 
 const
-  C_DEFAULT_SPLITTER_WIDTH = 2;
-  C_DEFAULT_TASKS_WIDTH = 150;
-  C_DEFAULT_BORDER_WIDTH = 1;
-  C_DEFAULT_ROW_HEIGHT = 24;
+  C_DEF_SPLITTER_WIDTH = 2;
+  C_DEF_TASKS_WIDTH = 150;
+  C_DEF_BORDER_WIDTH = 1;
+  C_DEF_ROW_HEIGHT = 24;
+  C_DEF_PIXEL_PER_MINOR = 20;
   C_VPGANTT_WIDTH = 300;
   C_VPGANTT_HEIGHT = 150;
 
@@ -170,10 +171,13 @@ type
       //vars
       FCalendarWidth: integer;
       FCalendarHeight: integer;
-      FMajorScaleTitleRect: TRect;
-      FMinorScaleTitleRect: TRect;
+      FMajorScale: TvpTimeScale;
+      FMinorScale: TvpTimeScale;
       FMajorScaleCount: integer;
       FMinorScaleCount: integer;
+      FMajorScaleTitleRect: TRect;
+      FMinorScaleTitleRect: TRect;
+      FPixelePerMinorScale: integer;
 
       FStartIntervalDate: TDateTime;
       FEndIntervalDate: TDateTime;
@@ -220,6 +224,8 @@ type
   {TvpGantt}
   TvpGantt = class(TCustomControl)
     private
+      FEndDate: TDate;
+      FStartDate: TDate;
       FvpGanttOptions: TvpGanttOptions;
       FvpGanttTasks: TvpGanttTasks;
       FvpGanttCalendar: TvpGanttCalendar;
@@ -227,10 +233,6 @@ type
       FScrollBars: TScrollStyle;
 
       FIntervals: TList;
-      FMajorScale: TvpTimeScale;
-      FMinorScale: TvpTimeScale;
-      FStartDate: TDateTime;
-      FEndDate: TDateTime;
 
       FUpdateCount: integer;
 
@@ -253,6 +255,9 @@ type
       function GetIntervalCount: Integer;
       function GetInterval(AnIndex: Integer): TvpInterval;
       function GetBorderWidth: integer;
+      function GetMajorScale: TvpTimeScale;
+      function GetMinorScale: TvpTimeScale;
+      function GetPixelPerMinorScale: integer;
       function GetTaskTitleCaption: TCaption;
       procedure OnTitleFontChanged(Sender: TObject);
       function OptionsIsStored: Boolean;
@@ -263,6 +268,7 @@ type
       procedure SetMinorScale(AValue: TvpTimeScale);
       procedure SetMinorScaleHeight(AValue: integer);
       procedure SetOptions(AValue: TvpGanttOptions);
+      procedure SetPixelPerMinorScale(AValue: integer);
       procedure SetRowHeight(AValue: integer);
       procedure SetGanttBorderWidth(AValue: integer);
       procedure SetBorderColor(AValue: TColor);
@@ -279,6 +285,8 @@ type
       procedure WMKillFocus(var message: TLMKillFocus); message LM_KILLFOCUS;
     protected
       function GetFocusRow: integer;
+      function GetMajorScaleHeight: integer;
+      function GetMinorScaleHeight: integer;
       function GetRowPosY(const YPos: integer): integer;
       function GetTitleHeight: integer;
       procedure DrawThemedCell(ACanvas: TCanvas; aRect: TRect);
@@ -313,24 +321,25 @@ type
       property BorderStyle;
       property BorderWidth;
       //custom property
-      property GanttBorderWidth: Integer read FGanttBorderWidth write SetGanttBorderWidth default 1;
-      property RowHeight: integer read FRowHeight write SetRowHeight default C_DEFAULT_ROW_HEIGHT;
       property BorderColor: TColor read FBorderColor write SetBorderColor default clActiveBorder;
+      property EndDate: TDate read FEndDate write SetEndDate;
+      property GanttBorderWidth: Integer read FGanttBorderWidth write SetGanttBorderWidth default 1;
+      property MajorScale: TvpTimeScale read GetMajorScale write SetMajorScale default vptsMonth;
+      property MajorScaleHeight: integer read FMajorScaleHeight write SetMajorScaleHeight default C_DEF_ROW_HEIGHT;
+      property MinorScale: TvpTimeScale read GetMinorScale write SetMinorScale default vptsDay;
+      property MinorScaleHeight: integer read FMinorScaleHeight write SetMinorScaleHeight default C_DEF_ROW_HEIGHT;
+      property Options: TvpGanttOptions read FvpGanttOptions write SetOptions stored OptionsIsStored default DefaultGanttOptions;
+      property PixelPerMinorScale: integer read GetPixelPerMinorScale write SetPixelPerMinorScale default C_DEF_PIXEL_PER_MINOR;
+      property RowHeight: integer read FRowHeight write SetRowHeight default C_DEF_ROW_HEIGHT;
+      property ScrollBars: TScrollStyle read FScrollBars write SetScrollBars default ssAutoBoth;
+      property StartDate: TDate read FStartDate write SetStartDate;
+      property TitleFont: TFont read FTitleFont write SetTitleFont;
+      property TitleStyle: TTitleStyle read FTitleStyle write SetTitleStyle;
       //TODO Move this properties to child control OR stay this HOW RULES?
       property TaskColor: TColor read FTaskColor write SetTaskColor default clWindow;
       property TitleColor: TColor read FTitleColor write SetTitleColor default clBtnFace;
       property TaskTitleCaption: TCaption read GetTaskTitleCaption write SetTaskTitleCaption;
       property CalendarColor:TColor read FCalendarColor write SetCalendarColor default clWindow;
-      property ScrollBars: TScrollStyle read FScrollBars write SetScrollBars default ssAutoBoth;
-      property TitleFont: TFont read FTitleFont write SetTitleFont;
-      property TitleStyle: TTitleStyle read FTitleStyle write SetTitleStyle;
-      property Options: TvpGanttOptions read FvpGanttOptions write SetOptions stored OptionsIsStored default DefaultGanttOptions;
-      property MajorScale: TvpTimeScale read FMajorScale write SetMajorScale default vptsMonth;
-      property MajorScaleHeight: integer read FMajorScaleHeight write SetMajorScaleHeight default C_DEFAULT_ROW_HEIGHT;
-      property MinorScale: TvpTimeScale read FMinorScale write SetMinorScale default vptsDay;
-      property MinorScaleHeight: integer read FMinorScaleHeight write SetMinorScaleHeight default C_DEFAULT_ROW_HEIGHT;
-      property StartDate: TDate read FStartDate write SetStartDate;
-      property EndDate: TDate read FEndDate write SetEndDate;
   end;
 
   //draw
@@ -882,8 +891,8 @@ begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.CalcScale');
   {$endif}
-  FMajorScaleCount := Round(UnitsBetweenDates(FStartIntervalDate, FEndIntervalDate, FvpGantt.FMajorScale));
-  FMinorScaleCount := Round(UnitsBetweenDates(FStartIntervalDate, FEndIntervalDate, FvpGantt.FMinorScale));
+  FMajorScaleCount := Round(UnitsBetweenDates(FStartIntervalDate, FEndIntervalDate, FMajorScale));
+  FMinorScaleCount := Round(UnitsBetweenDates(FStartIntervalDate, FEndIntervalDate, FMinorScale));
 end;
 
 procedure TvpGanttCalendar.CalcTitleSize;
@@ -1239,6 +1248,8 @@ begin
   Form1.Debug('TvpGanttCalendar.DrawEdges');
   {$endif}
   UnionRect(aRect, FMajorScaleTitleRect, FMinorScaleTitleRect);
+  //зальем все пространство, даже если у нас временной интервал короче
+  aRect.Right := Max(aRect.Right, ClientWidth);
   //clear canvas
   Canvas.Brush.Color := FvpGantt.FTitleColor;
   FvpGantt.DrawFillRect(Canvas, aRect);
@@ -1268,7 +1279,7 @@ begin
   for i:=0 to FMajorScaleCount-1 do
     begin
 
-      Canvas.TextRect(aRect, aRect.Left, aRect.top, GetTimeScaleName(FvpGantt.FMajorScale, IncTime(FvpGantt.StartDate, FvpGantt.FMajorScale, i)));
+      Canvas.TextRect(aRect, aRect.Left, aRect.top, GetTimeScaleName(FMajorScale, IncTime(FvpGantt.StartDate, FMajorScale, i)));
       inc(aRect.Left, 20);
     end;
 end;
@@ -1378,6 +1389,10 @@ begin
   {$endif}
   inherited create(AOwner);
   FvpGantt := AOwner;
+
+  FMajorScale := vptsMonth;
+  FMinorScale := vptsDay;
+  FPixelePerMinorScale := C_DEF_PIXEL_PER_MINOR;
 end;
 
 destructor TvpGanttCalendar.Destroy;
@@ -2078,14 +2093,24 @@ begin
   //TODO Сделать обновление области с фокусом
 end;
 
-procedure TvpGantt.SetMajorScaleHeight(AValue: integer);
+procedure TvpGantt.SetMajorScale(AValue: TvpTimeScale);
 begin
   {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetMajorScaleHeight');
+  Form1.Debug('TvpGantt.SetMajorScale');
   {$endif}
-  if FMajorScaleHeight = AValue then Exit;
-  FMajorScaleHeight := AValue;
-  VisualChange;
+  if not FvpGanttCalendar.HandleAllocated then
+    Exit;
+  if csReading in ComponentState then
+    FvpGanttCalendar.FMajorScale := AValue
+  else if AValue < FvpGanttCalendar.FMinorScale then
+    raise Exception.Create(RS_E_MAJORSCALE_LOW)
+  else if AValue = FvpGanttCalendar.FMinorScale then
+    raise Exception.Create(RS_E_MAJORSCALE_DIFF)
+  else
+    begin
+      FvpGanttCalendar.FMajorScale := AValue;
+      FvpGanttCalendar.UpdateIntervalDates(FStartDate, FEndDate);
+    end;
 end;
 
 procedure TvpGantt.SetMinorScale(AValue: TvpTimeScale);
@@ -2093,37 +2118,30 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetMinorScale');
   {$endif}
+  if not FvpGanttCalendar.HandleAllocated then
+    Exit;
   if csReading in ComponentState then
-    FMinorScale := AValue
-  else if AValue > MajorScale then
+    FvpGanttCalendar.FMinorScale := AValue
+  else if AValue > FvpGanttCalendar.FMajorScale then
     raise Exception.Create(RS_E_MINORSCALE_HIGH)
-  else if AValue = MajorScale then
+  else if AValue = FvpGanttCalendar.FMajorScale then
     raise Exception.Create(RS_E_MINORSCALE_DIFF)
   else
     begin
-      FMinorScale := AValue;
-      if FvpGanttCalendar.HandleAllocated then
-        FvpGanttCalendar.UpdateIntervalDates(FStartDate, FEndDate);
+      FvpGanttCalendar.FMinorScale := AValue;
+      FvpGanttCalendar.UpdateIntervalDates(FStartDate, FEndDate);
     end;
 end;
 
-procedure TvpGantt.SetMajorScale(AValue: TvpTimeScale);
+procedure TvpGantt.SetMajorScaleHeight(AValue: integer);
 begin
   {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetMajorScale');
+  Form1.Debug('TvpGantt.SetMajorScaleHeight');
   {$endif}
-  if csReading in ComponentState then
-    FMajorScale := AValue
-  else if AValue < MinorScale then
-    raise Exception.Create(RS_E_MAJORSCALE_LOW)
-  else if AValue = MinorScale then
-    raise Exception.Create(RS_E_MAJORSCALE_DIFF)
-  else
-    begin
-      FMajorScale := AValue;
-      if FvpGanttCalendar.HandleAllocated then
-        FvpGanttCalendar.UpdateIntervalDates(FStartDate, FEndDate);
-    end;
+  if FMajorScaleHeight = AValue then
+    Exit;
+  FMajorScaleHeight := AValue;
+  VisualChange;
 end;
 
 procedure TvpGantt.SetMinorScaleHeight(AValue: integer);
@@ -2131,7 +2149,8 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetMinorScaleHeight');
   {$endif}
-  if FMinorScaleHeight = AValue then Exit;
+  if FMinorScaleHeight = AValue then
+    Exit;
   FMinorScaleHeight := AValue;
   VisualChange;
 end;
@@ -2144,6 +2163,14 @@ begin
   if FvpGanttOptions = AValue then Exit;
   FvpGanttOptions := AValue;
   VisualChange;
+end;
+
+procedure TvpGantt.SetPixelPerMinorScale(AValue: integer);
+begin
+  if (not FvpGanttCalendar.HandleAllocated) OR (FvpGanttCalendar.FPixelePerMinorScale = AValue) then
+    Exit;
+  FvpGanttCalendar.FPixelePerMinorScale := AValue;
+  FvpGanttCalendar.Repaint;
 end;
 
 procedure TvpGantt.SetRowHeight(AValue: integer);
@@ -2329,6 +2356,40 @@ begin
     Result := 0;
 end;
 
+function TvpGantt.GetMajorScale: TvpTimeScale;
+begin
+  if not FvpGanttCalendar.HandleAllocated then
+    Result := vptsDay
+  else
+    Result := FvpGanttCalendar.FMajorScale;
+end;
+
+function TvpGantt.GetMajorScaleHeight: integer;
+begin
+  Result := FMajorScaleHeight;
+end;
+
+function TvpGantt.GetMinorScale: TvpTimeScale;
+begin
+  if not FvpGanttCalendar.HandleAllocated then
+    Result := vptsHour
+  else
+    Result := FvpGanttCalendar.FMinorScale;
+end;
+
+function TvpGantt.GetPixelPerMinorScale: integer;
+begin
+  if FvpGanttCalendar.HandleAllocated then
+    Result := FvpGanttCalendar.FPixelePerMinorScale
+  else
+    Result := C_DEF_PIXEL_PER_MINOR;
+end;
+
+function TvpGantt.GetMinorScaleHeight: integer;
+begin
+  Result := FMinorScaleHeight;
+end;
+
 function TvpGantt.GetTaskTitleCaption: TCaption;
 begin
   {$ifdef DBGGANTT}
@@ -2431,7 +2492,7 @@ begin
   //create vpGanttTasks
   FvpGanttTasks := TvpGanttTasks.Create(Self);
   InsertControl(FvpGanttTasks);
-  FvpGanttTasks.Width := C_DEFAULT_TASKS_WIDTH;
+  FvpGanttTasks.Width := C_DEF_TASKS_WIDTH;
   FvpGanttTasks.Align := alLeft;
 
   //create splitter
@@ -2440,7 +2501,7 @@ begin
   //FSplitter.ResizeStyle := rsPattern;
   FSplitter.Left := FvpGanttTasks.Left + FvpGanttTasks.Width + 1;
   FSplitter.Align := alLeft;
-  FSplitter.Width := C_DEFAULT_SPLITTER_WIDTH;
+  FSplitter.Width := C_DEF_SPLITTER_WIDTH;
 
   //create vpGanttTasks
   FvpGanttCalendar := TvpGanttCalendar.Create(Self);
@@ -2454,16 +2515,16 @@ begin
   Width := C_VPGANTT_WIDTH;
   Height := C_VPGANTT_HEIGHT;
 
-  GanttBorderWidth := C_DEFAULT_BORDER_WIDTH;
+  GanttBorderWidth := C_DEF_BORDER_WIDTH;
   TitleColor := clBtnFace;
   TaskColor := clWindow;
   CalendarColor := clWindow;
   BorderColor := clActiveBorder;
   ScrollBars := ssAutoBoth;
 
-  RowHeight := C_DEFAULT_ROW_HEIGHT;
-  MajorScaleHeight := C_DEFAULT_ROW_HEIGHT;
-  MinorScaleHeight := C_DEFAULT_ROW_HEIGHT;
+  RowHeight := C_DEF_ROW_HEIGHT;
+  MajorScaleHeight := C_DEF_ROW_HEIGHT;
+  MinorScaleHeight := C_DEF_ROW_HEIGHT;
 
   FTitleFont := TFont.Create;
   FTitleFont.OnChange := @OnTitleFontChanged;
@@ -2475,8 +2536,6 @@ begin
 
   TaskTitleCaption := RS_TITLE_TASKS;
 
-  MajorScale := vptsMonth;
-  MinorScale := vptsDay;
   StartDate := Now;
 
   EndUpdate();
@@ -2614,7 +2673,7 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.GetTitleHeight');
   {$endif}
-  if not Assigned(FvpGanttTasks) then
+  if not FvpGanttTasks.HandleAllocated then
     Result := -1;
   Result := FMajorScaleHeight + FMinorScaleHeight;
 end;

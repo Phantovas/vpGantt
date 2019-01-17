@@ -107,6 +107,7 @@ object Form1: TForm1
       Top = 1
       Width = 263
       Align = alClient
+      ColCount = 3
       TabOrder = 2
       TitleStyle = tsNative
     end
