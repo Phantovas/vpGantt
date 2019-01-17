@@ -109,9 +109,9 @@ begin
   GanttDiagram.ScrollBars := ssBoth;
   GanttDiagram.BorderStyle := bsSingle;
   GanttDiagram.TaskTitleCaption := 'Проекты';
-  GanttDiagram.MinorScale := vptsHour;
-  GanttDiagram.MajorScale := vptsDay;
-  //GanttDiagram.TitleStyle := tsStandard;
+  GanttDiagram.MinorScale := vptsDecMinute;
+  GanttDiagram.MajorScale := vptsHour;
+  //GanttDiagram.TitleStyle := tsNative;
   Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   for i:=0 to 25 do
     begin

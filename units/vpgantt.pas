@@ -18,7 +18,7 @@ const
   C_DEF_TASKS_WIDTH = 150;
   C_DEF_BORDER_WIDTH = 1;
   C_DEF_ROW_HEIGHT = 24;
-  C_DEF_PIXEL_PER_MINOR = 20;
+  C_DEF_PIXEL_PER_MINOR = 30;
   C_VPGANTT_WIDTH = 300;
   C_VPGANTT_HEIGHT = 150;
 
@@ -115,7 +115,7 @@ type
       FvpGantt: TvpGantt;
       //vars
       FTasksWidth: integer;
-      FTasksHeight: integer;
+      FTasksHeight: integer; //нужно для хранения высоты области без/с скролом
       FTitleHeight: integer;
       FXScrollPosition: integer;
       //scrollbars
@@ -123,8 +123,8 @@ type
       //methods
       procedure CalcFocusRect(var aRect: TRect);
       function CalcRowRect(aRow: integer): TRect;
-      procedure CalcTasksHeight;
       procedure CalcTasksWidth;
+      procedure CalcTasksHeight;
       procedure CalcTitleHeight;
       procedure CalcScrollbarsRange;
       function GetTitleRect: TRect;
@@ -186,8 +186,10 @@ type
       FVSbVisible: boolean;
       FHSbVisible: boolean;
       //methods
-      procedure CalcScale;
-      procedure CalcTitleSize;
+      procedure CalcScaleCount;
+      procedure CalcTitleSizes;
+      procedure CalcCalendarHeight;
+      procedure CalcCalendarWidth;
       function GetMajorScaleHeight: integer;
       function GetMinorScaleHeight: integer;
       procedure UpdateSBVisibility;
@@ -198,7 +200,6 @@ type
     protected
       procedure CreateParams(var Params: TCreateParams); override;
       procedure ClearCanvas;
-      procedure DrawBackgroundTitle;
       procedure DrawEdges;
       procedure DrawMajorScale;
       procedure DrawMinorScale;
@@ -239,6 +240,7 @@ type
       FRowHeight: integer;
       FMajorScaleHeight: integer;
       FMinorScaleHeight: integer;
+      FIntervalsHeight: integer;
       FGanttBorderWidth: integer;
       FBorderColor: TColor;
       FTaskColor: TColor;
@@ -284,6 +286,8 @@ type
       procedure WMSetFocus(var message: TLMSetFocus); message LM_SETFOCUS;
       procedure WMKillFocus(var message: TLMKillFocus); message LM_KILLFOCUS;
     protected
+      procedure CalcIntervalsHeight;
+      function GetIntervalsHeight: integer; //высота всех интервалов
       function GetFocusRow: integer;
       function GetMajorScaleHeight: integer;
       function GetMinorScaleHeight: integer;
@@ -292,6 +296,7 @@ type
       procedure DrawThemedCell(ACanvas: TCanvas; aRect: TRect);
       procedure DrawFillRect(ACanvas:TCanvas; aRect: TRect);
       procedure DrawTitleGrid(ACanvas: TCanvas; aRect: TRect);
+      procedure DrawTitleCell(ACanvas: TCanvas; aRect: TRect; aText: string);
       procedure FontChanged(Sender: TObject); override;
       procedure Paint; override;
       procedure SetFocusRow(AValue: integer);
@@ -460,7 +465,7 @@ begin
     vptsDecMinute:
       Result := MinuteSpan(Start, Finish)/10;
     vptsHour:
-      Result := HourSpan(Start, Finish)/10;
+      Result := HourSpan(Start, Finish);
     vptsDay, vptsDayWeek:
       Result := DaySpan(Start, Finish);
     vptsWeek, vptsWeekNum, vptsWeekNumPlain:
@@ -611,53 +616,29 @@ begin
 
   case TimeScale of
     vptsMinute:
-      begin
-        Result := IntToStr(Min);
-      end;
+      Result := IntToStr(Min);
     vptsDecMinute:
-      begin
-        Result := IntToStr(Min*10);
-      end;
+      Result := IntToStr(Min);
     vptsHour:
-      begin
-        Result := IntToStr(Hour);
-      end;
+      Result := IntToStr(Hour);
     vptsDay:
-      begin
-        Result := IntToStr(Day);
-      end;
+      Result := IntToStr(Day);
     vptsDayWeek:
-      begin
-        Result := ShortDayNames[DayOfWeek(D)];
-      end;
+      Result := ShortDayNames[DayOfWeek(D)];
     vptsWeek:
-      begin
-        Result := IntToStr(Day) + '.' + IntToStr(Month);
-      end;
+      Result := IntToStr(Day) + '.' + IntToStr(Month);
     vptsWeekNum:
-      begin
-        Result := RS_WEEK + IntToStr(WeekOfTheYear(D));
-      end;
+      Result := RS_WEEK + IntToStr(WeekOfTheYear(D));
     vptsWeekNumPlain:
-      begin
-        Result := IntToStr(WeekOfTheYear(D));
-      end;
+      Result := IntToStr(WeekOfTheYear(D));
     vptsMonth:
-      begin
-        Result := ShortMonthNames[Month];
-      end;
+      Result := LongMonthNames[Month];
     vptsQuarter:
-      begin
-        Result := RS_KW + IntToStr((Month) div 3 + 1);
-      end;
+      Result := RS_KW + IntToStr((Month) div 3 + 1);
     vptsHalfYear:
-      begin
-        Result := IntToStr((Month) div 6 + 1);
-      end;
+      Result := IntToStr((Month) div 6 + 1);
     vptsYear:
-      begin
-        Result := IntToStr(Year);
-      end;
+      Result := IntToStr(Year);
   end;
 end;
 
@@ -886,19 +867,21 @@ begin
   end;
 end;
 
-procedure TvpGanttCalendar.CalcScale;
+procedure TvpGanttCalendar.CalcScaleCount;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.CalcScale');
   {$endif}
+  if (FStartIntervalDate=0) AND (FEndIntervalDate=0) then
+    Exit;
   FMajorScaleCount := Round(UnitsBetweenDates(FStartIntervalDate, FEndIntervalDate, FMajorScale));
   FMinorScaleCount := Round(UnitsBetweenDates(FStartIntervalDate, FEndIntervalDate, FMinorScale));
 end;
 
-procedure TvpGanttCalendar.CalcTitleSize;
+procedure TvpGanttCalendar.CalcTitleSizes;
 begin
   {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.GetMajorScaleRect');
+  Form1.Debug('TvpGanttCalendar.CalcTitleSizes');
   {$endif}
   //Здесь считаем размер титла
   //большая шкала.
@@ -910,20 +893,39 @@ begin
   FMinorScaleTitleRect.Bottom := FvpGantt.MajorScaleHeight + FvpGantt.MinorScaleHeight;
 end;
 
+procedure TvpGanttCalendar.CalcCalendarHeight;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.CalcCalendarHeight');
+  {$endif}
+  FCalendarHeight := FvpGantt.GetIntervalsHeight;
+end;
+
+procedure TvpGanttCalendar.CalcCalendarWidth;
+var
+   i: integer;
+
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.CalcCalendarWidth');
+  {$endif}
+  FCalendarWidth := FMinorScaleCount * FPixelePerMinorScale;
+end;
+
 function TvpGanttCalendar.GetMajorScaleHeight: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.GetMajorScaleRect');
+  Form1.Debug('TvpGanttCalendar.GetMajorScaleHeight');
   {$endif}
-  Result := FMajorScaleTitleRect.Bottom - FMajorScaleTitleRect.Top;
+  Result := FMajorScaleTitleRect.Height;
 end;
 
 function TvpGanttCalendar.GetMinorScaleHeight: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.GetMinorScaleRect');
+  Form1.Debug('TvpGanttCalendar.GetMinorScaleHeight');
   {$endif}
-  Result := FMinorScaleTitleRect.Bottom - FMinorScaleTitleRect.Top;
+  Result := FMinorScaleTitleRect.Height;
 end;
 
 procedure TvpGanttCalendar.UpdateSBVisibility;
@@ -943,12 +945,14 @@ begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.UpdateSizes');
   {$endif}
-  CalcScale;
+  CalcScaleCount;
   {$ifdef DBGGANTTCALENDAR}
   Form1.EL.Debug('Major scale count %d', [FMajorScaleCount]);
   Form1.EL.Debug('Minor scale count %d', [FMinorScaleCount]);
   {$endif}
-  CalcTitleSize;
+  CalcCalendarHeight;
+  CalcCalendarWidth;
+  CalcTitleSizes;
 end;
 
 {
@@ -1240,75 +1244,53 @@ begin
   Canvas.Rectangle(ClientRect);
 end;
 
-procedure TvpGanttCalendar.DrawBackgroundTitle;
-var
-  aRect: TRect;
-begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.DrawEdges');
-  {$endif}
-  UnionRect(aRect, FMajorScaleTitleRect, FMinorScaleTitleRect);
-  //зальем все пространство, даже если у нас временной интервал короче
-  aRect.Right := Max(aRect.Right, ClientWidth);
-  //clear canvas
-  Canvas.Brush.Color := FvpGantt.FTitleColor;
-  FvpGantt.DrawFillRect(Canvas, aRect);
-end;
-
 procedure TvpGanttCalendar.DrawMajorScale;
 var
   aRect: TRect;
+  aMinorPerMajorScale: integer;
+  aScaleName: string;
   i: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawMajorScale');
   {$endif}
-  aRect := FMajorScaleTitleRect;
-  if FvpGantt.TitleStyle = tsNative then
-    FvpGantt.DrawThemedCell(Canvas, aRect)
-  else
-    begin
-      //заливаем
-      Canvas.Brush.Style := bsSolid;
-      Canvas.Brush.Color := FvpGantt.TitleColor;
-      FvpGantt.DrawFillRect(Canvas, aRect);
-    end;
-  //граница
-  FvpGantt.DrawTitleGrid(Canvas, aRect);
-  //рисуем названия
+  //считаем кол-во минорных областей в одной мажорной области
+  //целочисленное деление только для того чтобы компилятор не ругался
+  aMinorPerMajorScale := FMinorScaleCount div FMajorScaleCount;
+  //берем для начала всю клиентскую область
+  //длину вычисляем, высота будет равна заданной пользователем
+  {TODO -o Vas Сделать проверку на ширину сетки}
+  aRect := Rect(0, 0, FPixelePerMinorScale * aMinorPerMajorScale, FvpGantt.MajorScaleHeight);
+  //перебираем все и рисуем
   for i:=0 to FMajorScaleCount-1 do
     begin
-
-      Canvas.TextRect(aRect, aRect.Left, aRect.top, GetTimeScaleName(FMajorScale, IncTime(FvpGantt.StartDate, FMajorScale, i)));
-      inc(aRect.Left, 20);
+      aScaleName := GetTimeScaleName(FMajorScale, IncTime(FvpGantt.StartDate, FMajorScale, i));
+      //рисуем
+      FvpGantt.DrawTitleCell(Canvas, aRect, aScaleName);
+      //сдвигаем область
+      OffsetRect(aRect, FPixelePerMinorScale * aMinorPerMajorScale, 0);
     end;
 end;
 
 procedure TvpGanttCalendar.DrawMinorScale;
 var
   aRect: TRect;
+  i: integer;
+  aScaleName: string;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawMinorScale');
   {$endif}
   aRect := FMinorScaleTitleRect;
-  if FvpGantt.TitleStyle = tsNative then
-    FvpGantt.DrawThemedCell(Canvas, aRect)
-  else
+  aRect.Right := FPixelePerMinorScale;
+  for i:=0 to FMinorScaleCount-1 do
     begin
-      //заливаем
-      Canvas.Brush.Style := bsSolid;
-      Canvas.Brush.Color := FvpGantt.TitleColor;
-      FvpGantt.DrawFillRect(Canvas, aRect);
+      aScaleName := GetTimeScaleName(FMinorScale, IncTime(FvpGantt.StartDate, FMinorScale, i));
+      //рисуем
+      FvpGantt.DrawTitleCell(Canvas, aRect, aScaleName);
+      //сдвигаем область
+      OffsetRect(aRect, FPixelePerMinorScale, 0);
     end;
-  //граница
-  FvpGantt.DrawTitleGrid(Canvas, aRect);
-  //titRect := GetTitleRect;
-  //titCaption := PChar(FvpGantt.TaskTitleCaption);
-  ////рисуем границу
-  //Canvas.Pen.Style := psSolid;
-  //Canvas.Pen.Color := clActiveBorder;
-  //Canvas.Line(aRect.Left, aRect.Top, aRect.Right, aRect.Top);
 end;
 
 procedure TvpGanttCalendar.GetSBVisibility(out HsbVisible, VsbVisible: boolean);
@@ -1377,7 +1359,6 @@ begin
   {$endif}
   ClearCanvas;
   DrawEdges;
-  DrawBackgroundTitle;
   DrawMajorScale;
   DrawMinorScale;
 end;
@@ -1539,18 +1520,6 @@ begin
                  Self.ClientWidth - 1, aStart + FvpGantt.RowHeight + aRowBorder);
 end;
 
-procedure TvpGanttTasks.CalcTasksHeight;
-var
-  i: integer;
-begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.CalculateTasksHeight');
-  {$EndIf}
-  FTasksHeight := 0;
-  for i:=0 to FvpGantt.IntervalCount-1 do
-    FTasksHeight := FTasksHeight + FvpGantt.RowHeight;
-end;
-
 procedure TvpGanttTasks.CalcTasksWidth;
 var
   i, aBorder: integer;
@@ -1563,6 +1532,14 @@ begin
   for i:=0 to FvpGantt.IntervalCount - 1 do
     FTasksWidth := Max(FTasksWidth, Canvas.TextWidth(FvpGantt.Interval[i].FName) );
   FTasksWidth := Max(FTasksWidth + 2*constCellPadding + aBorder, ClientWidth);
+end;
+
+procedure TvpGanttTasks.CalcTasksHeight;
+begin
+  {$ifdef DBGGANTTTASKS}
+  Form1.Debug('TvpGanttTasks.CalcTasksHeight');
+  {$EndIf}
+  FTasksHeight := FvpGantt.FIntervalsHeight;
 end;
 
 procedure TvpGanttTasks.CalcTitleHeight;
@@ -1685,24 +1662,11 @@ begin
   {$endif}
   titRect := GetTitleRect;
   titCaption := PChar(FvpGantt.TaskTitleCaption);
-  if FvpGantt.TitleStyle = tsNative then
-    FvpGantt.DrawThemedCell(Canvas, titRect)
-  else
-    begin
-      //заливаем
-      Canvas.Brush.Style := bsSolid;
-      Canvas.Brush.Color := FvpGantt.TitleColor;
-      FvpGantt.DrawFillRect(Canvas, titRect);
-    end;
-  //граница
-  FvpGantt.DrawTitleGrid(Canvas, titRect);
-  //пишем текст
   if Assigned(FvpGantt) then
     Canvas.Font.Assign(FvpGantt.TitleFont)
   else
     Canvas.Font := Font;
-  InflateRect(titRect, -1, -1);
-  DrawText(Canvas.Handle, PChar(titCaption), Length(titCaption), titRect, DT_CENTER OR DT_SINGLELINE OR DT_VCENTER);
+  FvpGantt.DrawTitleCell(Canvas, titRect, titCaption);
 end;
 
 procedure TvpGanttTasks.FixScroll(const ARange, APage, APos: integer);
@@ -2020,6 +1984,26 @@ procedure TvpGantt.ClearDates;
 begin
   FStartDate := 0;
   FEndDate := 0;
+end;
+
+procedure TvpGantt.CalcIntervalsHeight;
+var
+  i: integer;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.CalcIntervalsHeight');
+  {$EndIf}
+  FIntervalsHeight := 0;
+  for i:=0 to IntervalCount-1 do
+    FIntervalsHeight := FIntervalsHeight + RowHeight;
+end;
+
+function TvpGantt.GetIntervalsHeight: integer;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.GetIntervalsHeight');
+  {$EndIf}
+  Result := FIntervalsHeight;
 end;
 
 function TvpGantt.GetIntervalCount: Integer;
@@ -2731,6 +2715,28 @@ begin
       ACanvas.LineTo(aRect.Right - 1, aRect.Bottom);
       ACanvas.LineTo(aRect.Right - 1, aRect.Top);
     end;
+end;
+
+procedure TvpGantt.DrawTitleCell(ACanvas: TCanvas; aRect: TRect; aText: string);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.DrawTitleCell');
+  {$endif}
+  //рисуем бекграунд со стилями
+  if FTitleStyle = tsNative then
+    DrawThemedCell(ACanvas, aRect)
+  else
+    begin
+      //заливаем
+      ACanvas.Brush.Style := bsSolid;
+      ACanvas.Brush.Color := TitleColor;
+      DrawFillRect(ACanvas, aRect);
+    end;
+  //граница
+  DrawTitleGrid(ACanvas, aRect);
+  //рисуем названия
+  SetBkMode(ACanvas.Handle, TRANSPARENT);
+  DrawText(ACanvas.Handle, PChar(aText), Length(aText), aRect, DT_CENTER OR DT_SINGLELINE OR DT_VCENTER);
 end;
 
 
