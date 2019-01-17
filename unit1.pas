@@ -55,6 +55,7 @@ procedure TForm1.Button1Click(Sender: TObject);
 begin
   Debug('TForm1.Button1Click');
   Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', GanttDiagram.StartDate));
+  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', GanttDiagram.StartDate));
   Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', GanttDiagram.EndDate));
   Memo1.Lines.Add(Format('%d', [DateTimeToTimeStamp(GanttDiagram.StartDate).DAte]));
   Memo1.Lines.Add(Format('%d', [DateTimeToTimeStamp(GanttDiagram.EndDate).Date]));

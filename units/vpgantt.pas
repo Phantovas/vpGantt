@@ -34,6 +34,7 @@ type
   //vptsDecMinute - десятки минут (10..60),
   //vptsHour - часы,
   //vptsDay - дни,
+  //vptsDayWeek - дни недели,
   //vptsWeek - недели (дата.год),
   //vptsWeekNum - номер недели,
   //vptsWeekNumPlain - название недели,
@@ -45,6 +46,7 @@ type
                   vptsDecMinute,
                   vptsHour,
                   vptsDay,
+                  vptsDayWeek,
                   vptsWeek,
                   vptsWeekNum,
                   vptsWeekNumPlain,
@@ -62,13 +64,10 @@ const
 resourcestring
   RS_TITLE_TASKS = 'Задача';
   //Scale
-  RS_E_MAJORSCALE_HIGH = 'MajorScale should by higher than MinorScale';
+  RS_E_MAJORSCALE_LOW = 'MajorScale should by higher than MinorScale';
   RS_E_MAJORSCALE_DIFF = 'MajorScale should by different from MinorScale';
-  RS_E_MINORSCALE_LOW = 'MinorScale should by lower than MajorScale';
+  RS_E_MINORSCALE_HIGH = 'MinorScale should by lower than MajorScale';
   RS_E_MINORSCALE_DIFF = 'MinorScale should by different from MajorScale';
-  //Time
-  RS_E_STARTDATE_HIGH = 'Start date should by lower than end date';
-  RS_E_ENDDATE_HIGH = 'End date should by lower than start date';
   //date
   RS_WEEK = 'Нед. ';
   RS_KW = 'Кв. ';
@@ -175,8 +174,10 @@ type
       FMinorScaleTitleRect: TRect;
       FMajorScaleCount: integer;
       FMinorScaleCount: integer;
-      //FMajorScaleStart: integer;
-      //FMinorScaleStart: integer;
+
+      FStartIntervalDate: TDateTime;
+      FEndIntervalDate: TDateTime;
+
       //scrollbars
       FVSbVisible: boolean;
       FHSbVisible: boolean;
@@ -207,6 +208,7 @@ type
       function  ScrollBarAutomatic(Which: TScrollStyle): boolean; virtual;
       procedure UpdateHorzScrollBar(const aVisible: boolean; const aRange,aPage,aPos: Integer); virtual;
       procedure UpdateVertScrollbar(const aVisible: boolean; const aRange,aPage,aPos: Integer); virtual;
+      procedure UpdateIntervalDates(AStartDate, AEndDate: TDate);
       procedure VisualChange; virtual;
       procedure WMHScroll(var message : TLMHScroll); message LM_HSCROLL;
       procedure WMVScroll(var message : TLMVScroll); message LM_VSCROLL;
@@ -247,12 +249,14 @@ type
       FTitleStyle: TTitleStyle;
       FFocusRow: integer;
       //methods
+      procedure ClearDates;
       function GetIntervalCount: Integer;
       function GetInterval(AnIndex: Integer): TvpInterval;
       function GetBorderWidth: integer;
       function GetTaskTitleCaption: TCaption;
       procedure OnTitleFontChanged(Sender: TObject);
       function OptionsIsStored: Boolean;
+      procedure SetEndDate(AValue: TDate);
       procedure SetFocusColor(AValue: TColor);
       procedure SetMajorScale(AValue: TvpTimeScale);
       procedure SetMajorScaleHeight(AValue: integer);
@@ -270,7 +274,6 @@ type
       procedure SetTitleColor(AValue: TColor);
       procedure SetTitleFont(const AValue: TFont);
       procedure SetTitleStyle(const AValue: TTitleStyle);
-      procedure UpdateDates(AStartDate, AEndDate: TDate);
       procedure VisualChange;
       procedure WMSetFocus(var message: TLMSetFocus); message LM_SETFOCUS;
       procedure WMKillFocus(var message: TLMKillFocus); message LM_KILLFOCUS;
@@ -327,7 +330,7 @@ type
       property MinorScale: TvpTimeScale read FMinorScale write SetMinorScale default vptsDay;
       property MinorScaleHeight: integer read FMinorScaleHeight write SetMinorScaleHeight default C_DEFAULT_ROW_HEIGHT;
       property StartDate: TDate read FStartDate write SetStartDate;
-      property EndDate: TDate read FEndDate;
+      property EndDate: TDate read FEndDate write SetEndDate;
   end;
 
   //draw
@@ -449,7 +452,7 @@ begin
       Result := MinuteSpan(Start, Finish)/10;
     vptsHour:
       Result := HourSpan(Start, Finish)/10;
-    vptsDay:
+    vptsDay, vptsDayWeek:
       Result := DaySpan(Start, Finish);
     vptsWeek, vptsWeekNum, vptsWeekNumPlain:
       Result := WeekSpan(Start, Finish);
@@ -504,7 +507,7 @@ begin
           (FinishStamp.Time / 1000 / 60 / 60 + FinishStamp.Date * 24) -
           (StartStamp.Time / 1000 / 60 / 60 + StartStamp.Date * 24);
       end;
-    vptsDay:
+    vptsDay, vptsDayWeek:
       begin
         Result :=
           (FinishStamp.Time / 1000 / 60 / 60 / 24 + FinishStamp.Date) -
@@ -612,6 +615,10 @@ begin
       end;
     vptsDay:
       begin
+        Result := IntToStr(Day);
+      end;
+    vptsDayWeek:
+      begin
         Result := ShortDayNames[DayOfWeek(D)];
       end;
     vptsWeek:
@@ -669,7 +676,7 @@ begin
       Result := IncMinute(D, IncAmount * 10);
     vptsHour:
       Result := IncHour(D, IncAmount);
-    vptsDay:
+    vptsDay, vptsDayWeek:
       Result := IncDay(D, IncAmount);
     vptsWeek, vptsWeekNum, vptsWeekNumPlain:
       Result := IncWeek(D, IncAmount);
@@ -724,7 +731,7 @@ begin
         S.Time := MSecsPerDay + S.Time;
       end;
     end;
-    vptsDay:
+    vptsDay, vptsDayWeek:
     begin
       Inc(S.Date, Trunc(IncAmount));
 
@@ -875,8 +882,8 @@ begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.CalcScale');
   {$endif}
-  FMajorScaleCount := Round(UnitsBetweenDates(FvpGantt.FStartDate, FvpGantt.FEndDate, FvpGantt.FMajorScale));
-  FMinorScaleCount := Round(UnitsBetweenDates(FvpGantt.FStartDate, FvpGantt.FEndDate, FvpGantt.FMinorScale));
+  FMajorScaleCount := Round(UnitsBetweenDates(FStartIntervalDate, FEndIntervalDate, FvpGantt.FMajorScale));
+  FMinorScaleCount := Round(UnitsBetweenDates(FStartIntervalDate, FEndIntervalDate, FvpGantt.FMinorScale));
 end;
 
 procedure TvpGanttCalendar.CalcTitleSize;
@@ -884,7 +891,8 @@ begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.GetMajorScaleRect');
   {$endif}
-  //большая шкала
+  //Здесь считаем размер титла
+  //большая шкала.
   FMajorScaleTitleRect := ClientRect;
   FMajorScaleTitleRect.Bottom := FvpGantt.MajorScaleHeight;
   //маленькая шкала
@@ -932,6 +940,93 @@ begin
   Form1.EL.Debug('Minor scale count %d', [FMinorScaleCount]);
   {$endif}
   CalcTitleSize;
+end;
+
+{
+  Будем использовать процедуру всегда:
+    1) при смене даты
+    2) при смене любой из шкал
+    3) при измненении интервалов
+}
+procedure TvpGanttCalendar.UpdateIntervalDates(AStartDate, AEndDate: TDate);
+var
+  aSYear, aSMonth, aSDay: word;
+  aEYear, aEMonth, aEDay: word;
+begin
+  {$ifdef DBGGANTT}
+  Form1.EL.Debug('TvpGanttCalendar.UpdateIntervalDates %s %s', [DateToStr(AStartDate), DateToStr(AEndDate)]);
+  {$endif}
+  //если текущая дата меньше устанавливаемой, то пересчитываем
+  AStartDate := Min(AStartDate, FvpGantt.StartDate);
+  DecodeDate(AStartDate, aSYear, aSMonth, aSDay);
+  //а вдруг как-то передадим дату начала > даты окончания, не порядок
+  AEndDate := Max(AEndDate, FvpGantt.EndDate);
+  if AEndDate<AStartDate then
+    AEndDate := AStartDate;
+  DecodeDate(AEndDate, aEYear, aEMonth, aEDay);
+  case FvpGantt.MajorScale of
+    //берем начало дня
+    //концом диапазона будем считать день в 23:59:59
+    //минуты быть не могут, но возьмем и их
+    vptsMinute, vptsDecMinute, vptsHour, vptsDay, vptsDayWeek:
+      begin
+       FStartIntervalDate := StartOfADay(aSYear, aSMonth, aSDay);
+       FEndIntervalDate := EndOfADay(aEYear, aEMonth, aEDay);
+      end;
+    //недели
+    vptsWeek, vptsWeekNum, vptsWeekNumPlain:
+      begin
+        FStartIntervalDate := StartOfAWeek(aSYear, aSMonth, aSDay);
+        FEndIntervalDate := EndOfAWeek(aEYear, aEMonth, aEDay);
+      end;
+    //месяц
+    vptsMonth:
+      begin
+        FStartIntervalDate := StartOfAMonth(aSYear, aSMonth);
+        FEndIntervalDate := EndOfAMonth(aEYear, aEMonth);
+      end;
+    //квартал
+    vptsQuarter:
+      begin
+        case aSMonth of
+          1..3: FStartIntervalDate := StartOfAMonth(aSYear, 1);
+          4..6: FStartIntervalDate := StartOfAMonth(aSYear, 4);
+          7..9: FStartIntervalDate := StartOfAMonth(aSYear, 7);
+          10..12: FStartIntervalDate := StartOfAMonth(aSYear, 10);
+        end;
+        case aSMonth of
+          1..3: FEndIntervalDate := EndOfAMonth(aEYear, 3);
+          4..6: FEndIntervalDate := EndOfAMonth(aEYear, 6);
+          7..9: FEndIntervalDate := EndOfAMonth(aEYear, 9);
+          10..12: FEndIntervalDate := EndOfAMonth(aEYear, 12);
+        end;
+      end;
+    //полугодия
+    vptsHalfYear:
+      if aSMonth<7 then
+        begin
+          FStartIntervalDate := StartOfAMonth(aSYear, 1);
+          FEndIntervalDate := EndOfAMonth(aEYear, 6);
+        end
+      else
+        begin
+          FStartIntervalDate := StartOfAMonth(aSYear, 7);
+          FEndIntervalDate := EndOfAMonth(aEYear, 12);
+        end;
+    //года
+    vptsYear:
+      begin
+        FStartIntervalDate := StartOfAYear(aSYear);
+        FEndIntervalDate := EndOfAYear(aEYear);
+      end;
+  end;
+  {$ifdef DBGGANTT}
+  Form1.Debug('Start date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FvpGantt.StartDate));
+  Form1.Debug('End date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FvpGantt.EndDate));
+  Form1.Debug('Start interval date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FStartIntervalDate));
+  Form1.Debug('End interval date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FEndIntervalDate));
+  {$endif}
+  VisualChange;
 end;
 
 procedure TvpGanttCalendar.VisualChange;
@@ -1170,8 +1265,9 @@ begin
   //граница
   FvpGantt.DrawTitleGrid(Canvas, aRect);
   //рисуем названия
-  for i:=0 to FMajorScaleCount -1 do
+  for i:=0 to FMajorScaleCount-1 do
     begin
+
       Canvas.TextRect(aRect, aRect.Left, aRect.top, GetTimeScaleName(FvpGantt.FMajorScale, IncTime(FvpGantt.StartDate, FvpGantt.FMajorScale, i)));
       inc(aRect.Left, 20);
     end;
@@ -1905,6 +2001,12 @@ end;
 
 { TvpGantt }
 
+procedure TvpGantt.ClearDates;
+begin
+  FStartDate := 0;
+  FEndDate := 0;
+end;
+
 function TvpGantt.GetIntervalCount: Integer;
 begin
   {$ifdef DBGGANTT}
@@ -1940,98 +2042,30 @@ begin
   Result := FvpGanttOptions <> DefaultGanttOptions;
 end;
 
-{
-  Будем использовать процедуру всегда:
-    1) при смене даты
-    2) при смене любой из шкал
-    3) при измненении интервалов
-}
-procedure TvpGantt.UpdateDates(AStartDate, AEndDate: TDate);
+procedure TvpGantt.SetEndDate(AValue: TDate);
 var
-  aSYear, aSMonth, aSDay: word;
-  aEYear, aEMonth, aEDay: word;
+  aDT: TDateTime;
+  aYear, aMonth, ADay: word;
 begin
   {$ifdef DBGGANTT}
-  Form1.EL.Debug('TvpGantt.UpdateDates %s %s', [DateToStr(AStartDate), DateToStr(AEndDate)]);
+  Form1.Debug('TvpGantt.SetEndDate');
   {$endif}
-  //если даты не меняются, смысл считать их?
-  if (FStartDate=AStartDate) AND (FEndDate=AEndDate) then
+  //декодируем в числа и получаем конец дня
+  DecodeDate(AValue, aYear, aMonth, ADay);
+  aDT := EndOfADay(aYear, aMonth, ADay);
+  if FEndDate = aDT then
     Exit;
-  //сначала устанавливаем начало диапазона
-  if (FStartDate<>AStartDate) then
+  if csReading in ComponentState then
+    FEndDate := aDT
+  //если текущее время меньше начального, то устанавливаем ему начало этогоже дня
+  else
     begin
-      DecodeDate(AStartDate, aSYear, aSMonth, aSDay);
-      case FMajorScale of
-        //берем начало дня
-        vptsMinute, vptsDecMinute, vptsHour, vptsDay:
-           FStartDate := StartOfADay(aSYear, aSMonth, aSDay);
-        //берем начало недели
-        vptsWeek, vptsWeekNum, vptsWeekNumPlain:
-          FStartDate := StartOfAWeek(aSYear, aSMonth, aSDay);
-        //берем начало месяца
-        vptsMonth:
-          FStartDate := StartOfAMonth(aSYear, aSMonth);
-        //берем начало квартала
-        vptsQuarter:
-          begin
-            case aSMonth of
-              1..3: FStartDate := StartOfAMonth(aSYear, 1);
-              4..6: FStartDate := StartOfAMonth(aSYear, 4);
-              7..9: FStartDate := StartOfAMonth(aSYear, 7);
-              10..12: FStartDate := StartOfAMonth(aSYear, 10);
-            end;
-          end;
-        //начало полугодия
-        vptsHalfYear:
-          if aSMonth<7 then
-            FStartDate := StartOfAMonth(aSYear, 1)
-          else
-            FStartDate := StartOfAMonth(aSYear, 7);
-        //начало года
-        vptsYear:
-          FStartDate := StartOfAYear(aSYear);
-      end;
+      FEndDate := aDT;
+      if FEndDate<FStartDate then
+        FStartDate := StartOfTheDay(aDT);
+      if FvpGanttCalendar.HandleAllocated then
+        FvpGanttCalendar.UpdateIntervalDates(FStartDate, FEndDate);
     end;
-  //затем конец диапазона
-  //если конец диапазона меньше текущего И ткущая конечная дата не равна
-  //вновь устанавливаемой
-  if (AEndDate<=FStartDate) OR (FEndDate<>AEndDate) then
-    begin
-      //выбираем максимальную из двух
-      AEndDate := Max(FStartDate, AEndDate);
-      DecodeDate(AEndDate, aEYear, aEMonth, aEDay);
-      case FMajorScale of
-        //концом диапазона будем считать день в 23:59:59
-        //минуты быть не могут, но возьмем и их
-        vptsMinute, vptsDecMinute, vptsHour, vptsDay:
-          FEndDate := EndOfADay(aEYear, aEMonth, aEDay);
-        vptsWeek, vptsWeekNum, vptsWeekNumPlain:
-          FEndDate := EndOfAWeek(aEYear, aEMonth, aEDay);
-        vptsMonth:
-          FEndDate := EndOfAMonth(aEYear, aEMonth);
-        vptsQuarter:
-          begin
-            case aSMonth of
-              1..3: FEndDate := EndOfAMonth(aEYear, 3);
-              4..6: FEndDate := EndOfAMonth(aEYear, 6);
-              7..9: FEndDate := EndOfAMonth(aEYear, 9);
-              10..12: FEndDate := EndOfAMonth(aEYear, 12);
-            end;
-          end;
-        vptsHalfYear:
-          if aSMonth<7 then
-            FEndDate := EndOfAMonth(aEYear, 6)
-          else
-            FEndDate := EndOfAMonth(aEYear, 12);
-        vptsYear:
-          FEndDate := EndOfAYear(aEYear);
-      end;
-    end;
-  {$ifdef DBGGANTT}
-  Form1.Debug('Start date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FStartDate));
-  Form1.Debug('End date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FEndDate));
-  {$endif}
-  VisualChange;
 end;
 
 procedure TvpGantt.SetFocusColor(AValue: TColor);
@@ -2062,13 +2096,14 @@ begin
   if csReading in ComponentState then
     FMinorScale := AValue
   else if AValue > MajorScale then
-    raise Exception.Create(RS_E_MINORSCALE_LOW)
+    raise Exception.Create(RS_E_MINORSCALE_HIGH)
   else if AValue = MajorScale then
     raise Exception.Create(RS_E_MINORSCALE_DIFF)
   else
     begin
       FMinorScale := AValue;
-      UpdateDates(FStartDate, FEndDate);
+      if FvpGanttCalendar.HandleAllocated then
+        FvpGanttCalendar.UpdateIntervalDates(FStartDate, FEndDate);
     end;
 end;
 
@@ -2080,13 +2115,14 @@ begin
   if csReading in ComponentState then
     FMajorScale := AValue
   else if AValue < MinorScale then
-    raise Exception.Create(RS_E_MAJORSCALE_HIGH)
+    raise Exception.Create(RS_E_MAJORSCALE_LOW)
   else if AValue = MinorScale then
     raise Exception.Create(RS_E_MAJORSCALE_DIFF)
   else
     begin
       FMajorScale := AValue;
-      UpdateDates(FStartDate, FEndDate);
+      if FvpGanttCalendar.HandleAllocated then
+        FvpGanttCalendar.UpdateIntervalDates(FStartDate, FEndDate);
     end;
 end;
 
@@ -2150,17 +2186,22 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetStartDate');
   {$endif}
-  //декодируем в числа и получаем конец дня
+  //декодируем в числа и получаем начало дня
   DecodeDate(AValue, aYear, aMonth, ADay);
   aDT := StartOfADay(aYear, aMonth, ADay);
   if FStartDate = aDT then
     Exit;
   if csReading in ComponentState then
     FStartDate := aDT
-  else if aDT<FEndDate then
-    raise Exception.Create(RS_E_STARTDATE_HIGH)
+  //если текущее время больше конечного, то устанавливаем ему конец этого же дня
   else
-    UpdateDates(aDT, FEndDate);
+    begin
+      FStartDate := aDT;
+      if FStartDate>FEndDate then
+        FEndDate := EndOfTheDay(aDT);
+      if FvpGanttCalendar.HandleAllocated then
+        FvpGanttCalendar.UpdateIntervalDates(FStartDate, FEndDate);
+    end;
 end;
 
 procedure TvpGantt.SetTaskColor(AValue: TColor);
@@ -2515,9 +2556,11 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.UpdateInterval');
   {$endif}
+  //изменяются даты, пересчитаем только в случае если календарь создан
   if AUpdateDate then
-    UpdateDates(TvpInterval(FIntervals[FFocusRow]).FStartDate,
-                TvpInterval(FIntervals[FFocusRow]).FFinishDate);
+    if FvpGanttCalendar.HandleAllocated then
+      FvpGanttCalendar.UpdateIntervalDates(TvpInterval(FIntervals[FFocusRow]).FStartDate,
+                                           TvpInterval(FIntervals[FFocusRow]).FFinishDate);
   VisualChange;
 end;
 
