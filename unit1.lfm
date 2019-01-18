@@ -10,8 +10,8 @@ object Form1: TForm1
   VertScrollBar.Smooth = True
   VertScrollBar.Range = 592
   Caption = 'Form1'
-  ClientHeight = 0
-  ClientWidth = 0
+  ClientHeight = 700
+  ClientWidth = 1058
   OnClose = FormClose
   OnShow = FormShow
   LCLVersion = '1.6.4.0'
@@ -107,7 +107,7 @@ object Form1: TForm1
       Top = 1
       Width = 263
       Align = alClient
-      ColCount = 3
+      ColCount = 150
       TabOrder = 2
       TitleStyle = tsNative
     end
