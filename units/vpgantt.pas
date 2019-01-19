@@ -66,7 +66,7 @@ const
   SCROLL_PAGE_DEFAULT = 100;
   constCellPadding: byte = 3;
   constRubberSpace: byte = 2;
-  DefaultGanttOptions = [vpgFocusHighlight, vpgMajorVertGrids, vpgMinorVertGrids, vpgRowHighlight];
+  DefaultGanttOptions = [vpgDrawFocusSelected, vpgMajorVertGrids, vpgMinorVertGrids, vpgRowHighlight];
 
 resourcestring
   RS_TITLE_TASKS = 'Задача';
@@ -235,6 +235,7 @@ type
       procedure VisualChange; virtual;
       procedure WMHScroll(var message : TLMHScroll); message LM_HSCROLL;
       procedure WMVScroll(var message : TLMVScroll); message LM_VSCROLL;
+      procedure WMLButtonDown(var message: TLMLButtonDown); message LM_LBUTTONDOWN;
     public
       constructor Create(AOwner: TvpGantt);  reintroduce;
       destructor Destroy; override;
@@ -250,6 +251,7 @@ type
       FvpGanttCalendar: TvpGanttCalendar;
       FSplitter: TSplitter;
       FScrollBars: TScrollStyle;
+      FGanttFocused: boolean;
 
       FIntervals: TList;
 
@@ -302,8 +304,8 @@ type
       procedure SetTitleColor(AValue: TColor);
       procedure SetTitleFont(const AValue: TFont);
       procedure SetTitleStyle(const AValue: TTitleStyle);
+      procedure SetFocus; override;
       procedure VisualChange;
-      procedure WMSetFocus(var message: TLMSetFocus); message LM_SETFOCUS;
       procedure WMKillFocus(var message: TLMKillFocus); message LM_KILLFOCUS;
     protected
       procedure CalcIntervalsHeight;
@@ -1185,6 +1187,22 @@ begin
   {$endif}
 end;
 
+procedure TvpGanttCalendar.WMLButtonDown(var message: TLMLButtonDown);
+var
+  aRow: integer;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.WMLButtonDown');
+  Form1.EL.Debug('x %d y %d',[message.XPos, message.YPos]);
+  {$endif}
+  inherited;
+  //TODO Вычесть значение прокрутки по Y
+  aRow := FvpGantt.GetRowPosY(message.YPos);
+  if aRow>-1 then
+    FvpGantt.SetFocusRow(aRow);
+  FvpGantt.SetFocus;
+end;
+
 procedure TvpGanttCalendar.WMSize(var Message: TLMSize);
 begin
   {$ifdef DBGGANTTCALENDAR}
@@ -1385,7 +1403,7 @@ begin
   Form1.EL.Debug('Focused %d', [Integer(Focused)]);
   {$endif}
   CalcFocusRect(aRect);
-  if FvpGantt.Focused then
+  if FvpGantt.FGanttFocused then
     FvpGantt.DrawHighlightRect(Canvas, aRect)
   else if (vpgDrawFocusSelected in FvpGantt.Options) then
     begin
@@ -1879,9 +1897,11 @@ begin
   Form1.EL.Debug('Focused %d', [Integer(Focused)]);
   {$endif}
   CalcFocusRect(aRect);
-  if FvpGantt.Focused then
+  if FvpGantt.FGanttFocused then
     begin
+      //если строку подсвечивать
       FvpGantt.DrawHighlightRect(Canvas, aRect);
+      //если фокус подсвечивать
       if (vpgFocusHighlight in FvpGantt.Options) then
         begin
           Canvas.Brush.Color := clHighlight;
@@ -1902,12 +1922,14 @@ begin
       //  FFocusColor := OldFocusColor;
       //end;
     end
-  else if (vpgDrawFocusSelected in FvpGantt.Options) then
-    begin
-      Canvas.Brush.Color := cl3DDkShadow;
-      Canvas.Font.Color := Font.Color;
-      Canvas.FillRect(ARect);
-    end;
+  else
+    //если рисовать фокус всегда, то независимо от фокуса надо нарисовать неактивным цветом фокус
+    if (vpgDrawFocusSelected in FvpGantt.Options) then
+      begin
+        Canvas.Brush.Color := cl3DDkShadow;
+        Canvas.Font.Color := Font.Color;
+        Canvas.FillRect(ARect);
+      end;
 end;
 
 procedure TvpGanttTasks.DrawRow(aRow: integer);
@@ -2565,6 +2587,16 @@ begin
   Invalidate;
 end;
 
+procedure TvpGantt.SetFocus;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.SetFocus');
+  {$endif}
+  inherited;
+  FGanttFocused := true;
+  VisualChange;
+end;
+
 procedure TvpGantt.VisualChange;
 begin
   {$ifdef DBGGANTT}
@@ -2582,14 +2614,6 @@ begin
     end;
 end;
 
-procedure TvpGantt.WMSetFocus(var message: TLMSetFocus);
-begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.WMSetFocus');
-  {$endif}
-  VisualChange;
-end;
-
 procedure TvpGantt.WMKillFocus(var message: TLMKillFocus);
 var
   R: TRect;
@@ -2597,10 +2621,16 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.WMKillFocus');
   {$endif}
+  FGanttFocused := false;
   if FvpGanttTasks.HandleAllocated then
     begin
       R := FvpGanttTasks.CalcRowRect(FFocusRow);
       InvalidateRect(FvpGanttTasks.Handle, @R, true);
+    end;
+  if FvpGanttCalendar.HandleAllocated then
+    begin
+      R := FvpGanttCalendar.CalcRowRect(FFocusRow);
+      InvalidateRect(FvpGanttCalendar.Handle, @R, true);
     end;
 end;
 
@@ -2984,7 +3014,7 @@ begin
   if (vpgRowHighlight in Options) then
     begin
       AOldBrush := Canvas.Brush;
-      if Focused then
+      if FGanttFocused then
         ACanvas.Brush.Color := FRowHighlightColor
       else
         ACanvas.Brush.Color := cl3DShadow;
