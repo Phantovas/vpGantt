@@ -1361,6 +1361,7 @@ var
   aRect: TRect;
   aScaleName: string;
   i: integer;
+  aStartRange, aStopRange: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawMajorScale');
@@ -1368,12 +1369,19 @@ begin
   //считаем кол-во минорных областей в одной мажорной области
   //берем для начала всю клиентскую область
   //длину вычисляем, высота будет равна заданной пользователем
-  {TODO -o Vas Сделать проверку на ширину сетки}
   aRect := Rect(0, 0, GetMajorScaleWidth, FvpGantt.MajorScaleHeight);
+  //считаем кол-во на которые прокручен скролл горизонтальный
+  aStartRange := Max(0, FHScrollPosition div GetMajorScaleWidth - 1);
+  //считаем кол-во видимых диапазонов
+  aStopRange := Min(((FHScrollPosition + ClientWidth) div GetMajorScaleWidth) + 1, FMajorScaleCount);
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.EL.Debug('DrawMajorStartStopRange %d %d', [aStartRange, aStopRange]);
+  {$endif}
   //сдвигаем на горизонтальный скролинг, по вертикали двигать не будем заголовки
-  OffsetRect(aRect, -FHScrollPosition, 0);
+  //и на кол-во прокрученных диспазонов - 1
+  OffsetRect(aRect, GetMajorScaleWidth * aStartRange - FHScrollPosition , 0);
   //перебираем все и рисуем
-  for i:=0 to FMajorScaleCount-1 do
+  for i:=aStartRange to aStopRange-1 do
     begin
       aScaleName := GetTimeScaleName(FMajorScale, IncTime(FStartIntervalDate, FMajorScale, i));
       //рисуем
@@ -1388,6 +1396,7 @@ var
   aRect: TRect;
   i: integer;
   aScaleName: string;
+  aStartRange, aStopRange: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawMinorScale');
@@ -1396,9 +1405,16 @@ begin
   aRect := Rect(0, FvpGantt.MajorScaleHeight + 1,
                 FPixelePerMinorScale,
                 FvpGantt.MajorScaleHeight + FvpGantt.MinorScaleHeight);
+  //считаем кол-во на которые прокручен скролл горизонтальный
+  aStartRange := Max(0, FHScrollPosition div GetMinorScaleWidth - 1);
+  //считаем кол-во видимых диапазонов
+  aStopRange := Min(((FHScrollPosition + ClientWidth) div GetMinorScaleWidth) + 1, FMinorScaleCount);
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.EL.Debug('DrawMinorStartStopRange %d %d', [aStartRange, aStopRange]);
+  {$endif}
   //сдвигаем на горизонтальный скролинг, по вертикали двигать не будем заголовки
-  OffsetRect(aRect, -FHScrollPosition, 0);
-  for i:=0 to FMinorScaleCount-1 do
+  OffsetRect(aRect, GetMinorScaleWidth * aStartRange - FHScrollPosition , 0);
+  for i:=aStartRange to aStopRange-1 do
     begin
       aScaleName := GetTimeScaleName(FMinorScale, IncTime(FStartIntervalDate, FMinorScale, i));
       //рисуем
