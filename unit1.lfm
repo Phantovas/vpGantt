@@ -108,6 +108,7 @@ object Form1: TForm1
       Width = 263
       Align = alClient
       ColCount = 150
+      Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goRangeSelect, goDrawFocusSelected, goSmoothScroll, goRowHighlight]
       TabOrder = 2
       TitleStyle = tsNative
     end

@@ -1,15 +1,17 @@
 unit vpGantt;
 
 //{$define DBGINTERVAL}
-{$define DBGGANTT}
+//{$define DBGGANTT}
 //{$define DBGGANTTTASKS}
-{$define DBGGANTTCALENDAR}
+//{$define DBGGANTTCALENDAR}
 
 interface
 
 uses
   LCLproc, LCLIntf, LCLType, LMessages, SysUtils, Classes, Controls,
-  Graphics, StdCtrls, Forms, ExtCtrls, Math, dateutils, Themes,
+  StdCtrls, Forms, ExtCtrls,
+  //require
+  Graphics, GraphUtil, Math, dateutils, Themes,
   //temp
   Dialogs;
 
@@ -21,6 +23,8 @@ const
   C_DEF_PIXEL_PER_MINOR = 30;
   C_VPGANTT_WIDTH = 300;
   C_VPGANTT_HEIGHT = 150;
+  C_TITLE_TEXT_INDENT = 3;
+  C_ROW_HIGHLITE_VALUE = 50;
 
 type
   TTitleStyle = (tsLazarus, tsStandard, tsNative);
@@ -62,7 +66,7 @@ const
   SCROLL_PAGE_DEFAULT = 100;
   constCellPadding: byte = 3;
   constRubberSpace: byte = 2;
-  DefaultGanttOptions = [vpgFocusHighlight, vpgMajorVertGrids, vpgMinorVertGrids];
+  DefaultGanttOptions = [vpgFocusHighlight, vpgMajorVertGrids, vpgMinorVertGrids, vpgRowHighlight];
 
 resourcestring
   RS_TITLE_TASKS = 'Задача';
@@ -194,6 +198,7 @@ type
       function CalcRowRect(const aRow: integer): TRect;
       procedure CalcCalendarHeight;
       procedure CalcCalendarWidth;
+      function CalcFocusRect(ARect: TRect): TRect;
       procedure CalcScaleCount;
       function GetMajorScaleHeight: integer;
       function GetMajorScaleWidth: integer;
@@ -209,6 +214,7 @@ type
       procedure CreateParams(var Params: TCreateParams); override;
       procedure ClearCanvas;
       procedure DrawEdges;
+      procedure DrawFocusRect(aRow: integer; aRect: TRect);
       procedure DrawMajorScale;
       procedure DrawMinorScale;
       procedure DrawRow(const aRow: integer);
@@ -255,14 +261,16 @@ type
       FIntervalsHeight: integer;
       FGanttBorderWidth: integer;
       FBorderColor: TColor;
-      FTaskColor: TColor;
-      FTitleColor: TColor;
       FCalendarColor: TColor;
       FFocusColor: TColor;
+      FRowHighlightColor: TColor;
+      FTaskColor: TColor;
+      FTitleColor: TColor;
       FTaskTitleCaption: TCaption;
       FTitleFont: TFont;
       FTitleFontIsDefault: boolean;
       FTitleStyle: TTitleStyle;
+      FTitleTextStyle: TTextStyle;
       FFocusRow: integer;
       //methods
       procedure ClearDates;
@@ -307,8 +315,10 @@ type
       function GetTitleHeight: integer;
       procedure DrawThemedCell(ACanvas: TCanvas; aRect: TRect);
       procedure DrawFillRect(ACanvas:TCanvas; aRect: TRect);
+      procedure DrawHighlightRect(ACanvas: TCanvas; ARect: TRect);
       procedure DrawTitleGrid(ACanvas: TCanvas; aRect: TRect);
-      procedure DrawTitleCell(ACanvas: TCanvas; aRect: TRect; aText: string);
+      procedure DrawTitleCell(ACanvas: TCanvas; aRect: TRect);
+      procedure DrawTitleText(ACanvas: TCanvas; aRect: TRect; aText: string; aAligment: TAlignment = taLeftJustify);
       function FixHScrollPosition(const ARange, APage, APos: integer): integer;
       procedure FontChanged(Sender: TObject); override;
       procedure Paint; override;
@@ -462,7 +472,6 @@ begin
   ReleaseDC(0, Canvas.Handle);
   Canvas.Free;
 end;
-
 
 {
   Функция определения количества временных интервалов между двумя датами
@@ -928,6 +937,18 @@ begin
   FCalendarWidth := FMinorScaleCount * FPixelePerMinorScale;
 end;
 
+function TvpGanttCalendar.CalcFocusRect(ARect: TRect): TRect;
+begin
+  {$ifdef TvpGanttCalendar}
+  Form1.Debug('TvpGanttCalendar.CalcFocusRect');
+  {$endif}
+  aRect.Left := 0;
+  aRect.Right := Min(aRect.Right, ClientWidth);
+  inc(aRect.Left);
+  //InflateRect(aRect, -1, 0);
+  inc(aRect.Top, 1);
+end;
+
 function TvpGanttCalendar.GetMajorScaleHeight: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
@@ -1356,6 +1377,37 @@ begin
   Canvas.Rectangle(ClientRect);
 end;
 
+procedure TvpGanttCalendar.DrawFocusRect(aRow: integer; aRect: TRect);
+begin
+  {$ifdef TvpGanttCalendar}
+  Form1.Debug('TvpGanttCalendar.DrawFocusRect');
+  // Draw focused cell if we have the focus
+  Form1.EL.Debug('Focused %d', [Integer(Focused)]);
+  {$endif}
+  CalcFocusRect(aRect);
+  if FvpGantt.Focused then
+    FvpGantt.DrawHighlightRect(Canvas, aRect)
+  else if (vpgDrawFocusSelected in FvpGantt.Options) then
+    begin
+      Canvas.Brush.Color := cl3DShadow;
+      Canvas.Font.Color := Font.Color;
+      Canvas.FillRect(aRect);
+    end;
+  //if FUseXORFeatures then begin
+  //  Canvas.SaveHandleState;
+  //  OldFocusColor := FFocusColor;
+  //  FFocusColor:= clBlack;//White not visible on White background
+  //  OldPenMode:=Canvas.Pen.Mode;
+  //  Canvas.Pen.Mode := pmXOR;
+  //end;
+  //DrawRubberRect(Canvas, aRect, FvpGantt.FocusColor);
+  //if FUseXORFeatures then begin
+  //  Canvas.Pen.Mode := OldPenMode;
+  //  Canvas.RestoreHandleState;
+  //  FFocusColor := OldFocusColor;
+  //end;
+end;
+
 procedure TvpGanttCalendar.DrawMajorScale;
 var
   aRect: TRect;
@@ -1385,7 +1437,8 @@ begin
     begin
       aScaleName := GetTimeScaleName(FMajorScale, IncTime(FStartIntervalDate, FMajorScale, i));
       //рисуем
-      FvpGantt.DrawTitleCell(Canvas, aRect, aScaleName);
+      FvpGantt.DrawTitleCell(Canvas, aRect);
+      FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taLeftJustify);
       //сдвигаем область
       OffsetRect(aRect, GetMajorScaleWidth, 0);
     end;
@@ -1418,7 +1471,8 @@ begin
     begin
       aScaleName := GetTimeScaleName(FMinorScale, IncTime(FStartIntervalDate, FMinorScale, i));
       //рисуем
-      FvpGantt.DrawTitleCell(Canvas, aRect, aScaleName);
+      FvpGantt.DrawTitleCell(Canvas, aRect);
+      FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taCenter);
       //сдвигаем область
       OffsetRect(aRect, FPixelePerMinorScale, 0);
     end;
@@ -1446,6 +1500,10 @@ begin
       {$ifdef DBGGANTTCALENDAR}
       Form1.EL.Debug('TvpGanttCalendar.DrawRow %d', [aRow]);
       {$endif}
+      //если фокус, то зальем строку
+      if aRow=FvpGantt.GetFocusRow then
+        DrawFocusRect(aRow, rRect);
+      //устанавливаем шриф и рисуем
       Canvas.Font := Font;
       Canvas.Pen.Style := psSolid;
       Canvas.Pen.Color := FvpGantt.BorderColor;
@@ -1470,8 +1528,6 @@ begin
                         aMajorScaleWidth*i - aBorderWidth - FHScrollPosition,
                         rRect.Bottom);
         end;
-      //if aRow=FvpGantt.GetFocusRow then
-      //  DrawFocusRect(aRow, rRect);
       ////считаем сдвиг и выводим текст
       //rRect.Top := Round(rRect.Top + (rRect.Height - Canvas.TextHeight('A'))/2);
       //Canvas.TextRect(rRect, rRect.Left + constCellPadding, rRect.Top, FvpGantt.Interval[aRow].Name);
@@ -1815,22 +1871,22 @@ begin
   // Canvas.FrameRect(ClientRect);
 end;
 
-procedure TvpGanttTasks.DrawFocusRect(aRow: integer; ARect: TRect);
+procedure TvpGanttTasks.DrawFocusRect(aRow: integer; aRect: TRect);
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.DrawFocusRect');
   // Draw focused cell if we have the focus
   Form1.EL.Debug('Focused %d', [Integer(Focused)]);
   {$endif}
+  CalcFocusRect(aRect);
   if FvpGantt.Focused then
     begin
-      CalcFocusRect(aRect);
+      FvpGantt.DrawHighlightRect(Canvas, aRect);
       if (vpgFocusHighlight in FvpGantt.Options) then
         begin
-          Canvas.Brush.Style := bsSolid;
           Canvas.Brush.Color := clHighlight;
           Canvas.Font.Color := clHighlightText;
-          Canvas.FillRect(aRect);
+          Canvas.FillRect(ARect);
         end;
       //if FUseXORFeatures then begin
       //  Canvas.SaveHandleState;
@@ -1845,6 +1901,12 @@ begin
       //  Canvas.RestoreHandleState;
       //  FFocusColor := OldFocusColor;
       //end;
+    end
+  else if (vpgDrawFocusSelected in FvpGantt.Options) then
+    begin
+      Canvas.Brush.Color := cl3DDkShadow;
+      Canvas.Font.Color := Font.Color;
+      Canvas.FillRect(ARect);
     end;
 end;
 
@@ -1894,7 +1956,8 @@ begin
     Canvas.Font.Assign(FvpGantt.TitleFont)
   else
     Canvas.Font := Font;
-  FvpGantt.DrawTitleCell(Canvas, titRect, titCaption);
+  FvpGantt.DrawTitleCell(Canvas, titRect);
+  FvpGantt.DrawTitleText(Canvas, titRect, titCaption, taCenter);
 end;
 
 procedure TvpGanttTasks.GetSBVisibility(out HsbVisible: boolean);
@@ -2717,6 +2780,7 @@ begin
   CalendarColor := clWindow;
   BorderColor := clActiveBorder;
   ScrollBars := ssAutoBoth;
+  FRowHighlightColor := GetHighLightColor(clHighlight, C_ROW_HIGHLITE_VALUE);
 
   RowHeight := C_DEF_ROW_HEIGHT;
   MajorScaleHeight := C_DEF_ROW_HEIGHT;
@@ -2726,6 +2790,18 @@ begin
   FTitleFont.OnChange := @OnTitleFontChanged;
   FTitleFont.Style := [fsBold];
   FTitleFontIsDefault := True;
+  with FTitleTextStyle do
+    begin
+      Alignment := taLeftJustify;
+      Layout := tlCenter;
+      SingleLine := true;
+      Clipping := true;
+      Wordbreak := false;
+      Opaque := true;
+      SystemFont := false;
+      RightToLeft := false;
+      EndEllipsis := true;
+    end;
 
   FFocusRow := -1;
   FFocusColor := clBlack;
@@ -2898,6 +2974,25 @@ begin
   ACanvas.FillRect(aRect);
 end;
 
+procedure TvpGantt.DrawHighlightRect(ACanvas: TCanvas; ARect: TRect);
+var
+  aOldBrush: TBrush;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.DrawHighlightRect');
+  {$endif}
+  if (vpgRowHighlight in Options) then
+    begin
+      AOldBrush := Canvas.Brush;
+      if Focused then
+        ACanvas.Brush.Color := FRowHighlightColor
+      else
+        ACanvas.Brush.Color := cl3DShadow;
+      ACanvas.FillRect(ARect);
+      ACanvas.Brush := aOldBrush;
+    end;
+end;
+
 procedure TvpGantt.DrawTitleGrid(ACanvas: TCanvas; aRect: TRect);
 begin
   {$ifdef DBGGANTT}
@@ -2929,9 +3024,8 @@ begin
     end;
 end;
 
-procedure TvpGantt.DrawTitleCell(ACanvas: TCanvas; aRect: TRect; aText: string);
+procedure TvpGantt.DrawTitleCell(ACanvas: TCanvas; aRect: TRect);
 begin
-  {TODO -o Vas Сделаьть возможность отрисовки в разных положениях (слева, центр, справа)}
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.DrawTitleCell');
   {$endif}
@@ -2947,9 +3041,25 @@ begin
     end;
   //граница
   DrawTitleGrid(ACanvas, aRect);
+end;
+
+procedure TvpGantt.DrawTitleText(ACanvas: TCanvas; aRect: TRect; aText: string;
+  aAligment: TAlignment = taLeftJustify);
+var
+  aTextStyle: TTextStyle;
+  textRect: TRect;
+begin
+  {TODO -o Vas Попробовать сделать для первого диапазона не прокручивающуюся надпись  }
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.DrawTitleCell');
+  {$endif}
   //рисуем названия
-  SetBkMode(ACanvas.Handle, TRANSPARENT);
-  DrawText(ACanvas.Handle, PChar(aText), Length(aText), aRect, DT_CENTER OR DT_SINGLELINE OR DT_VCENTER);
+  //SetBkMode(ACanvas.Handle, TRANSPARENT);
+  //DrawText(ACanvas.Handle, PChar(aText), Length(aText), aRect, DT_CENTER OR DT_SINGLELINE OR DT_VCENTER);
+  aTextStyle := FTitleTextStyle;
+  aTextStyle.Alignment := aAligment;
+  textRect := Rect(aRect.Left + C_TITLE_TEXT_INDENT, aRect.Top, aRect.Right - C_TITLE_TEXT_INDENT, aRect.Bottom);
+  ACanvas.TextRect(textRect, textRect.Left, textRect.Top, aText, aTextStyle);
 end;
 
 function TvpGantt.FixHScrollPosition(const ARange, APage, APos: integer): integer;
