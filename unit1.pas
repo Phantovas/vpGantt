@@ -23,6 +23,7 @@ type
     Memo1: TMemo;
     Panel1: TPanel;
     Panel2: TPanel;
+    Panel3: TPanel;
     Splitter1: TSplitter;
     StringGrid1: TStringGrid;
     procedure Button1Click(Sender: TObject);
@@ -101,11 +102,8 @@ begin
   EL.Active := True;
 
   GanttDiagram := TvpGantt.Create(Self);
-  GanttDiagram.Parent := Self;
-  GanttDiagram.Left := 10;
-  GanttDiagram.Top := 310;
-  GanttDiagram.Width := 500;
-  GanttDiagram.Height := 300;
+  GanttDiagram.Parent := Panel3;
+  GanttDiagram.Align := alClient;
   GanttDiagram.ScrollBars := ssBoth;
   GanttDiagram.BorderStyle := bsSingle;
   GanttDiagram.TaskTitleCaption := 'Проекты';

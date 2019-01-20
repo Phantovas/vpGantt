@@ -144,8 +144,8 @@ type
       procedure CreateParams(var Params: TCreateParams); override;
       procedure ClearCanvas;
       function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
-      function  DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean; override;
-      function  DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint): Boolean; override;
+      function DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean; override;
+      function DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint): Boolean; override;
       procedure DrawRows;
       procedure DrawEdges;
       procedure DrawFocusRect(aRow: integer; ARect: TRect);
@@ -213,6 +213,9 @@ type
       procedure CalcScrollbarsRange;
       procedure CreateParams(var Params: TCreateParams); override;
       procedure ClearCanvas;
+      function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
+      function DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean; override;
+      function DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint): Boolean; override;
       procedure DrawEdges;
       procedure DrawFocusRect(aRow: integer; aRect: TRect);
       procedure DrawMajorScale;
@@ -324,6 +327,7 @@ type
       function FixHScrollPosition(const ARange, APage, APos: integer): integer;
       procedure FontChanged(Sender: TObject); override;
       procedure Paint; override;
+      procedure RepaintFocus(aFocusRow: integer);
       procedure SetFocusRow(AValue: integer);
       procedure SelectNextRow(const ADelta: integer);
     public
@@ -1388,6 +1392,44 @@ begin
   Canvas.FillRect(ClientRect);
 end;
 
+function TvpGanttCalendar.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
+  MousePos: TPoint): Boolean;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.DoMouseWheel');
+  {$endif}
+  Form1.ShowParam(IntToStr(WheelDelta));
+  Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
+end;
+
+function TvpGanttCalendar.DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint
+  ): Boolean;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.DoMouseWheelDown');
+  {$endif}
+  Result := inherited DoMouseWheelDown(Shift, MousePos);
+  if not Result then
+    begin
+      FvpGantt.SelectNextRow(1);
+      Result := True; // handled, no further scrolling by the widgetset
+    end;
+end;
+
+function TvpGanttCalendar.DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint
+  ): Boolean;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.DoMouseWheelUp');
+  {$endif}
+  Result := inherited DoMouseWheelUp(Shift, MousePos);
+  if not Result then
+    begin
+      FvpGantt.SelectNextRow(-1);
+      Result := True; // handled, no further scrolling by the widgetset
+    end;
+end;
+
 procedure TvpGanttCalendar.DrawEdges;
 begin
   {$ifdef DBGGANTTCALENDAR}
@@ -1815,7 +1857,6 @@ begin
   Result.Left := 0;
   Result.Right := Min(Result.Right, ClientWidth);
   inc(Result.Left);
-  //InflateRect(aRect, -1, 0);
   inc(Result.Top);
 end;
 
@@ -1964,6 +2005,7 @@ begin
       {$ifdef DBGGANTTTASKS}
       Form1.EL.Debug('Drawing row %d', [aRow]);
       {$endif}
+      Canvas.Font := Font;
       //focus
       if aRow=FvpGantt.GetFocusRow then
         begin
@@ -1973,7 +2015,6 @@ begin
           DrawFocusRect(aRow, fRect);
         end;
       //бордюр и текст
-      Canvas.Font := Font;
       Canvas.Pen.Style := psSolid;
       Canvas.Pen.Color := FvpGantt.BorderColor;
       Canvas.MoveTo(rRect.Left, rRect.Bottom);
@@ -2617,6 +2658,25 @@ begin
   VisualChange;
 end;
 
+procedure TvpGantt.RepaintFocus(aFocusRow: integer);
+var
+  R: TRect;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.UpdateFocus');
+  {$endif}
+  if FvpGanttTasks.HandleAllocated then
+    begin
+      R := FvpGanttTasks.CalcRowRect(FFocusRow);
+      InvalidateRect(FvpGanttTasks.Handle, @R, true);
+    end;
+  if FvpGanttCalendar.HandleAllocated then
+    begin
+      R := FvpGanttCalendar.CalcRowRect(FFocusRow);
+      InvalidateRect(FvpGanttCalendar.Handle, @R, true);
+    end;
+end;
+
 procedure TvpGantt.VisualChange;
 begin
   {$ifdef DBGGANTT}
@@ -2642,16 +2702,7 @@ begin
   Form1.Debug('TvpGantt.WMKillFocus');
   {$endif}
   FGanttFocused := false;
-  if FvpGanttTasks.HandleAllocated then
-    begin
-      R := FvpGanttTasks.CalcRowRect(FFocusRow);
-      InvalidateRect(FvpGanttTasks.Handle, @R, true);
-    end;
-  if FvpGanttCalendar.HandleAllocated then
-    begin
-      R := FvpGanttCalendar.CalcRowRect(FFocusRow);
-      InvalidateRect(FvpGanttCalendar.Handle, @R, true);
-    end;
+  RepaintFocus(FFocusRow);
 end;
 
 function TvpGantt.GetBorderWidth: integer;
@@ -2740,14 +2791,20 @@ begin
 end;
 
 procedure TvpGantt.SetFocusRow(AValue: integer);
+var
+  R: TRect;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetFocusRow');
   {$endif}
   if (FFocusRow=AValue) OR (AValue>=FIntervals.Count) then
     Exit;
+  {TODO -o Vas Сделать прокрутку к месту фокусировки}
+  //стерли старый фокус
+  RepaintFocus(FFocusRow);
   FFocusRow := AValue;
-  Invalidate;
+  //нарисовали новый
+  RepaintFocus(FFocusRow);
 end;
 
 procedure TvpGantt.SelectNextRow(const ADelta: integer);
