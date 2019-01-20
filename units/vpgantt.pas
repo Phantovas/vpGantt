@@ -2,7 +2,7 @@ unit vpGantt;
 
 //{$define DBGINTERVAL}
 //{$define DBGGANTT}
-//{$define DBGGANTTTASKS}
+{$define DBGGANTTTASKS}
 //{$define DBGGANTTCALENDAR}
 
 interface
@@ -66,7 +66,7 @@ const
   SCROLL_PAGE_DEFAULT = 100;
   constCellPadding: byte = 3;
   constRubberSpace: byte = 2;
-  DefaultGanttOptions = [vpgDrawFocusSelected, vpgMajorVertGrids, vpgMinorVertGrids, vpgRowHighlight];
+  DefaultGanttOptions = [vpgDrawFocusSelected, vpgFocusHighlight, vpgMajorVertGrids, vpgMinorVertGrids, vpgRowHighlight];
 
 resourcestring
   RS_TITLE_TASKS = 'Задача';
@@ -128,7 +128,7 @@ type
       //scrollbars
       FHSbVisible: boolean;
       //methods
-      procedure CalcFocusRect(var aRect: TRect);
+      function CalcFocusRect(var aRect: TRect): TRect;
       function CalcRowRect(aRow: integer): TRect;
       procedure CalcTasksWidth;
       procedure CalcTasksHeight;
@@ -148,19 +148,19 @@ type
       function  DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint): Boolean; override;
       procedure DrawRows;
       procedure DrawEdges;
-      procedure DrawFocusRect(aRow: integer; ARect: TRect); virtual;
+      procedure DrawFocusRect(aRow: integer; ARect: TRect);
       procedure DrawRow(aRow: integer);
       procedure DrawTitle;
-      procedure GetSBVisibility(out HsbVisible: boolean); virtual;
+      procedure GetSBVisibility(out HsbVisible: boolean);
       procedure GetSBRanges(const HsbVisible: boolean;
-                    out HsbRange, HsbPage, HsbPos: Integer); virtual;
+                    out HsbRange, HsbPage, HsbPos: Integer);
       procedure Paint; override;
-      function  ScrollBarAutomatic(Which: TScrollStyle): boolean; virtual;
+      function  ScrollBarAutomatic(Which: TScrollStyle): boolean;
       function  ScrollBarIsVisible(Which:Integer): Boolean;
       procedure ScrollBarPosition(Which, Value: integer);
       procedure ScrollBarRange(Which:Integer; aRange,aPage,aPos: Integer);
       procedure ScrollBarShow(Which: Integer; aValue: boolean);
-      procedure UpdateHorzScrollBar(const aVisible: boolean; const aRange,aPage,aPos: Integer); virtual;
+      procedure UpdateHorzScrollBar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure WMHScroll(var message : TLMHScroll); message LM_HSCROLL;
       procedure WMLButtonDown(var message: TLMLButtonDown); message LM_LBUTTONDOWN;
     public
@@ -195,10 +195,10 @@ type
       FVSbVisible: boolean;
       FHSbVisible: boolean;
       //methods
-      function CalcRowRect(const aRow: integer): TRect;
       procedure CalcCalendarHeight;
       procedure CalcCalendarWidth;
       function CalcFocusRect(ARect: TRect): TRect;
+      function CalcRowRect(const aRow: integer): TRect;
       procedure CalcScaleCount;
       function GetMajorScaleHeight: integer;
       function GetMajorScaleWidth: integer;
@@ -219,18 +219,18 @@ type
       procedure DrawMinorScale;
       procedure DrawRow(const aRow: integer);
       procedure DrawRows;
-      procedure GetSBVisibility(out HsbVisible,VsbVisible:boolean);virtual;
+      procedure GetSBVisibility(out HsbVisible,VsbVisible:boolean);
       procedure GetSBRanges(const HsbVisible,VsbVisible: boolean;
-                    out HsbRange,VsbRange,HsbPage,VsbPage,HsbPos,VsbPos:Integer); virtual;
+                    out HsbRange,VsbRange,HsbPage,VsbPage,HsbPos,VsbPos:Integer);
       procedure Paint; override;
       procedure ScrollBarRange(Which:Integer; aRange,aPage,aPos: Integer);
       procedure ScrollBarPosition(Which, Value: integer);
       function  ScrollBarIsVisible(Which:Integer): Boolean;
       procedure ScrollBarPage(Which: Integer; aPage: Integer);
       procedure ScrollBarShow(Which: Integer; aValue: boolean);
-      function  ScrollBarAutomatic(Which: TScrollStyle): boolean; virtual;
-      procedure UpdateHorzScrollBar(const aVisible: boolean; const aRange,aPage,aPos: Integer); virtual;
-      procedure UpdateVertScrollbar(const aVisible: boolean; const aRange,aPage,aPos: Integer); virtual;
+      function  ScrollBarAutomatic(Which: TScrollStyle): boolean;
+      procedure UpdateHorzScrollBar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
+      procedure UpdateVertScrollbar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure UpdateIntervalDates(AStartDate, AEndDate: TDate);
       procedure VisualChange; virtual;
       procedure WMHScroll(var message : TLMHScroll); message LM_HSCROLL;
@@ -387,7 +387,8 @@ implementation
 
 uses Unit1;
 
-{$ifdef DBGGANTT OR DBGGANTTTASKS OR DBGGANTTCALENDAR}
+{$if Defined(DBGGANTT) OR Defined(DBGGANTTTASKS) OR Defined(DBGGANTTCALENDAR)}
+
 function SbToStr(Which: Integer): string;
 begin
   case Which of
@@ -894,6 +895,7 @@ end;
 function TvpGanttCalendar.CalcRowRect(const aRow: integer): TRect;
 var
   aStart, aRowBorder: integer;
+  tmpRect: TRect;
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttCalendar.CalcRowRect');
@@ -902,8 +904,11 @@ begin
   // -1 потому что рисуем обводку по контуру календаря
   aStart := FvpGantt.MajorScaleHeight + FvpGantt.MinorScaleHeight +
             (FvpGantt.RowHeight + aRowBorder) * aRow - 1;
-  Result := Rect(0 - FHScrollPosition, aStart,
+  //находим всю длину строки
+  tmpRect := Rect(0 - FHScrollPosition, aStart,
                  FCalendarWidth + aRowBorder - FHScrollPosition  - 1, aStart + FvpGantt.RowHeight + aRowBorder);
+  //обрезаем невидимые части
+  IntersectRect(Result, tmpRect, ClientRect);
 end;
 
 procedure TvpGanttCalendar.CalcScaleCount;
@@ -944,11 +949,12 @@ begin
   {$ifdef TvpGanttCalendar}
   Form1.Debug('TvpGanttCalendar.CalcFocusRect');
   {$endif}
-  aRect.Left := 0;
-  aRect.Right := Min(aRect.Right, ClientWidth);
-  inc(aRect.Left);
-  //InflateRect(aRect, -1, 0);
-  inc(aRect.Top, 1);
+  Result := aRect;
+  Result.Left := Max(Result.Left, ClientRect.Left);
+  Result.Right := Min(Result.Right, ClientRect.Right);
+  inc(Result.Left);
+  //InflateRect(Result, -2, -2);
+  inc(Result.Top, 1);
 end;
 
 function TvpGanttCalendar.GetMajorScaleHeight: integer;
@@ -1402,7 +1408,6 @@ begin
   // Draw focused cell if we have the focus
   Form1.EL.Debug('Focused %d', [Integer(Focused)]);
   {$endif}
-  CalcFocusRect(aRect);
   if FvpGantt.FGanttFocused then
     FvpGantt.DrawHighlightRect(Canvas, aRect)
   else if (vpgDrawFocusSelected in FvpGantt.Options) then
@@ -1498,7 +1503,7 @@ end;
 
 procedure TvpGanttCalendar.DrawRow(const aRow: integer);
 var
-  rRect: TRect;
+  rRect, fRect: TRect;
   i: integer;
   aBorderWidth: integer;
   aMinorScaleWidth, aMajorScaleWidth: integer;
@@ -1513,14 +1518,22 @@ begin
   aBorderWidth := FvpGantt.GetBorderWidth;
   aMajorScaleWidth := GetMajorScaleWidth;
   aMinorScaleWidth := GetMinorScaleWidth;
-  if rRect.Top<ClientHeight then
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.EL.Debug('rRect.Top %d  rRect.Height %d', [rRect.top, rRect.Height]);
+  {$endif}
+  if rRect.Height>0 then
     begin
       {$ifdef DBGGANTTCALENDAR}
-      Form1.EL.Debug('TvpGanttCalendar.DrawRow %d', [aRow]);
+      Form1.EL.Debug('Drawing row %d', [aRow]);
       {$endif}
       //если фокус, то зальем строку
       if aRow=FvpGantt.GetFocusRow then
-        DrawFocusRect(aRow, rRect);
+        begin
+          //если строку подсвечивать
+          fRect := CalcFocusRect(rRect);
+          FvpGantt.DrawHighlightRect(Canvas, fRect);
+          DrawFocusRect(aRow, fRect);
+        end;
       //устанавливаем шриф и рисуем
       Canvas.Font := Font;
       Canvas.Pen.Style := psSolid;
@@ -1793,21 +1806,23 @@ begin
     end;
 end;
 
-procedure TvpGanttTasks.CalcFocusRect(var aRect: TRect);
+function TvpGanttTasks.CalcFocusRect(var aRect: TRect): TRect;
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.CalcFocusRect');
   {$endif}
-  aRect.Left := 0;
-  aRect.Right := Min(aRect.Right, ClientWidth);
-  inc(aRect.Left);
+  Result := aRect;
+  Result.Left := 0;
+  Result.Right := Min(Result.Right, ClientWidth);
+  inc(Result.Left);
   //InflateRect(aRect, -1, 0);
-  inc(aRect.Top, 1);
+  inc(Result.Top);
 end;
 
 function TvpGanttTasks.CalcRowRect(aRow: integer): TRect;
 var
   aStart, aRowBorder: integer;
+  tmpRect: TRect;
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.CalcRowRect');
@@ -1818,8 +1833,10 @@ begin
   // -1 потому что рисуем обводку по контуру списка задач
   aStart := FTitleHeight +
             (FvpGantt.RowHeight + aRowBorder) * aRow - 1;
-  Result := Rect(0 - FHScrollPosition, aStart,
+  tmpRect := Rect(0 - FHScrollPosition, aStart,
                  Self.ClientWidth - 1, aStart + FvpGantt.RowHeight + aRowBorder);
+  //обрезаем невидимые части
+  IntersectRect(Result, tmpRect, ClientRect);
 end;
 
 procedure TvpGanttTasks.CalcTasksWidth;
@@ -1896,17 +1913,15 @@ begin
   // Draw focused cell if we have the focus
   Form1.EL.Debug('Focused %d', [Integer(Focused)]);
   {$endif}
-  CalcFocusRect(aRect);
+  //дальше рисуем
   if FvpGantt.FGanttFocused then
     begin
-      //если строку подсвечивать
-      FvpGantt.DrawHighlightRect(Canvas, aRect);
       //если фокус подсвечивать
       if (vpgFocusHighlight in FvpGantt.Options) then
         begin
           Canvas.Brush.Color := clHighlight;
           Canvas.Font.Color := clHighlightText;
-          Canvas.FillRect(ARect);
+          Canvas.FillRect(aRect);
         end;
       //if FUseXORFeatures then begin
       //  Canvas.SaveHandleState;
@@ -1924,43 +1939,50 @@ begin
     end
   else
     //если рисовать фокус всегда, то независимо от фокуса надо нарисовать неактивным цветом фокус
-    if (vpgDrawFocusSelected in FvpGantt.Options) then
+    if (vpgFocusHighlight in FvpGantt.Options) then
       begin
         Canvas.Brush.Color := cl3DDkShadow;
         Canvas.Font.Color := Font.Color;
-        Canvas.FillRect(ARect);
+        Canvas.FillRect(aRect);
       end;
 end;
 
 procedure TvpGanttTasks.DrawRow(aRow: integer);
 var
-  rRect: TRect;
+  rRect, fRect: TRect;
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.DrawRow');
   {$endif}
   if not Assigned(FvpGantt) then Exit;
   rRect := CalcRowRect(aRow);
-  if rRect.Top<ClientHeight then
+  {$ifdef DBGGANTTTASKS}
+  Form1.EL.Debug('rRect.Top %d  rRect.Height %d', [rRect.top, rRect.Height]);
+  {$endif}
+  if rRect.Height>0 then
     begin
       {$ifdef DBGGANTTTASKS}
-      Form1.EL.Debug('DrawRow %d', [aRow]);
+      Form1.EL.Debug('Drawing row %d', [aRow]);
       {$endif}
+      //focus
+      if aRow=FvpGantt.GetFocusRow then
+        begin
+          //если строку подсвечивать
+          fRect := CalcFocusRect(rRect);
+          FvpGantt.DrawHighlightRect(Canvas, fRect);
+          DrawFocusRect(aRow, fRect);
+        end;
+      //бордюр и текст
       Canvas.Font := Font;
       Canvas.Pen.Style := psSolid;
       Canvas.Pen.Color := FvpGantt.BorderColor;
       Canvas.MoveTo(rRect.Left, rRect.Bottom);
       Canvas.LineTo(rRect.Right, rRect.Bottom);
       Canvas.LineTo(rRect.Right, rRect.Top);
-      //focus
-      {$ifdef DBGGANTTTASKS}
-      Form1.EL.Debug('FvpGantt.GetFocusRow');
-      {$endif}
-      if aRow=FvpGantt.GetFocusRow then
-        DrawFocusRect(aRow, rRect);
       //считаем сдвиг и выводим текст
       rRect.Top := Round(rRect.Top + (rRect.Height - Canvas.TextHeight('A'))/2);
-      Canvas.TextRect(rRect, rRect.Left + constCellPadding, rRect.Top, FvpGantt.Interval[aRow].Name);
+      InflateRect(rRect, -1, -1);
+      Canvas.TextRect(rRect, rRect.Left + constCellPadding - FHScrollPosition, rRect.Top, FvpGantt.Interval[aRow].Name);
     end;
 end;
 
@@ -2219,10 +2241,8 @@ begin
   FHScrollPosition := FvpGantt.FixHScrollPosition(ScrollInfo.nMax, ScrollInfo.nPage, aPos);
 
   {$ifdef DBGGANTTTASKS}
-  Form1.Debug(Format('FScrollPosition %d', [FXScrollPosition]));
+  Form1.Debug(Format('FHScrollPosition %d', [FHScrollPosition]));
   {$endif}
-  //  if EditorMode then
-  //    EditorPos;
 
   Invalidate;
 end;
