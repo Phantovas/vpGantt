@@ -1,7 +1,7 @@
 unit vpGantt;
 
 //{$define DBGINTERVAL}
-{$define DBGGANTT}
+//{$define DBGGANTT}
 {$define DBGGANTTTASKS}
 //{$define DBGGANTTCALENDAR}
 
@@ -121,18 +121,20 @@ type
     private
       FvpGantt: TvpGantt;
       //vars
+      {TODO -o Vas Сменить высоту и ширину на TRect}
       FTasksWidth: integer;
-      FTasksHeight: integer; //нужно для хранения высоты области без/с скролом
+      FTasksHeight: integer; //нужно для хранения высоты всей области
       FTitleHeight: integer;
-      FHScrollPosition: integer;
+      FGridVisibleRect: TRect; //область видимых строк
       //scrollbars
+      FHScrollPosition: integer;
       FHSbVisible: boolean;
       //methods
       function CalcFocusRect(var aRect: TRect): TRect;
+      procedure CalcGridVisibleRect;
       function CalcRowRect(aRow: integer): TRect;
       procedure CalcTasksWidth;
       procedure CalcTasksHeight;
-      procedure CalcTitleHeight;
       procedure CalcScrollbarsRange;
       function GetTitleRect: TRect;
       procedure VisualChange; virtual;
@@ -155,7 +157,6 @@ type
       procedure GetSBRanges(const HsbVisible: boolean;
                     out HsbRange, HsbPage, HsbPos: Integer);
       procedure Paint; override;
-      function  ScrollBarAutomatic(Which: TScrollStyle): boolean;
       function  ScrollBarIsVisible(Which:Integer): Boolean;
       procedure ScrollBarPosition(Which, Value: integer);
       procedure ScrollBarRange(Which:Integer; aRange,aPage,aPos: Integer);
@@ -177,6 +178,7 @@ type
       //vars
       FCalendarWidth: integer;
       FCalendarHeight: integer;
+      FGridVisibleRect: TRect; //область видимых строк
       FMajorScale: TvpTimeScale;
       FMinorScale: TvpTimeScale;
       FMajorScaleCount: integer;
@@ -197,6 +199,7 @@ type
       //methods
       procedure CalcCalendarHeight;
       procedure CalcCalendarWidth;
+      procedure CalcGridVisibleRect;
       function CalcFocusRect(ARect: TRect): TRect;
       function CalcRowRect(const aRow: integer): TRect;
       procedure CalcScaleCount;
@@ -231,7 +234,6 @@ type
       function  ScrollBarIsVisible(Which:Integer): Boolean;
       procedure ScrollBarPage(Which: Integer; aPage: Integer);
       procedure ScrollBarShow(Which: Integer; aValue: boolean);
-      function  ScrollBarAutomatic(Which: TScrollStyle): boolean;
       procedure UpdateHorzScrollBar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure UpdateVertScrollbar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure UpdateIntervalDates(AStartDate, AEndDate: TDate);
@@ -328,6 +330,7 @@ type
       procedure FontChanged(Sender: TObject); override;
       procedure Paint; override;
       procedure RepaintFocus(aFocusRow: integer);
+      function  ScrollBarAutomatic(Which: TScrollStyle): boolean;
       procedure SetFocusRow(AValue: integer);
       procedure SelectNextRow(const ADelta: integer);
     public
@@ -883,19 +886,6 @@ begin
   end;
 end;
 
-function TvpGanttCalendar.ScrollBarAutomatic(Which: TScrollStyle): boolean;
-begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.ScrollBarAutomatic');
-  {$endif}
-  result:=false;
-  if (Which=ssVertical)or(Which=ssHorizontal) then begin
-    if Which=ssVertical then Which:=ssAutoVertical
-    else Which:=ssAutoHorizontal;
-    Result:= FvpGantt.ScrollBars in [Which, ssAutoBoth];
-  end;
-end;
-
 function TvpGanttCalendar.CalcRowRect(const aRow: integer): TRect;
 var
   aStart, aRowBorder: integer;
@@ -912,7 +902,8 @@ begin
   tmpRect := Rect(0 - FHScrollPosition, aStart,
                  FCalendarWidth + aRowBorder - FHScrollPosition  - 1, aStart + FvpGantt.RowHeight + aRowBorder);
   //обрезаем невидимые части
-  IntersectRect(Result, tmpRect, ClientRect);
+  {TODO -o Vas Пофиксить обрезку части строки внизу, иначе выводится черти-что}
+  IntersectRect(Result, tmpRect, FGridVisibleRect);
 end;
 
 procedure TvpGanttCalendar.CalcScaleCount;
@@ -938,7 +929,7 @@ begin
   Form1.Debug('TvpGanttCalendar.CalcCalendarHeight');
   Form1.El.Debug('FvpGantt.IntervalCount=%d FvpGantt.GetIntervalsHeight=%d', [FvpGantt.IntervalCount, FvpGantt.GetIntervalsHeight]);
   {$endif}
-  FCalendarHeight := FvpGantt.GetIntervalsHeight;
+  FCalendarHeight := FvpGantt.GetTitleHeight + FvpGantt.GetIntervalsHeight;
 end;
 
 procedure TvpGanttCalendar.CalcCalendarWidth;
@@ -947,6 +938,18 @@ begin
   Form1.Debug('TvpGanttCalendar.CalcCalendarWidth');
   {$endif}
   FCalendarWidth := FMinorScaleCount * FPixelePerMinorScale;
+end;
+
+procedure TvpGanttCalendar.CalcGridVisibleRect;
+begin
+  {$ifdef DBGGANTTTASKS}
+  Form1.Debug('TvpGanttTasks.CalcGridVisibleRect');
+  {$endif}
+  //рассчитываем область
+  FGridVisibleRect.Left := ClientRect.Left;
+  FGridVisibleRect.Top := ClientRect.Top + FvpGantt.GetTitleHeight;
+  FGridVisibleRect.Width := ClientWidth;
+  FGridVisibleRect.Height := Ceil(ClientHeight / FvpGantt.RowHeight)* FvpGantt.RowHeight;
 end;
 
 function TvpGanttCalendar.CalcFocusRect(ARect: TRect): TRect;
@@ -1014,6 +1017,7 @@ begin
   CalcCalendarHeight;
   CalcCalendarWidth;
   CalcScrollbarsRange;
+  CalcGridVisibleRect;
 end;
 
 {
@@ -1275,7 +1279,6 @@ begin
   Form1.EL.Debug('x %d y %d',[message.XPos, message.YPos]);
   {$endif}
   inherited;
-  //TODO Вычесть значение прокрутки по Y
   aRow := FvpGantt.GetRowPosY(message.YPos);
   if aRow>-1 then
     FvpGantt.SetFocusRow(aRow);
@@ -1682,8 +1685,8 @@ begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.GetSBVisibility');
   {$endif}
-  AutoVert := ScrollBarAutomatic(ssVertical);
-  AutoHorz := ScrollBarAutomatic(ssHorizontal);
+  AutoVert := FvpGantt.ScrollBarAutomatic(ssVertical);
+  AutoHorz := FvpGantt.ScrollBarAutomatic(ssHorizontal);
 
   //// get client bounds free of bars
   ClientW  := ClientWidth;
@@ -1797,6 +1800,7 @@ begin
       CalcTasksHeight;
       CalcTasksWidth;
       CalcScrollbarsRange;
+      CalcGridVisibleRect;
     end;
 end;
 
@@ -1814,8 +1818,7 @@ begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.GetTitleRect');
   {$endif}
-  CalcTitleHeight;
-  result := Rect(0, 0, ClientWidth, FTitleHeight);
+  result := Rect(0, 0, ClientWidth, FvpGantt.GetTitleHeight);
 end;
 
 procedure TvpGanttTasks.WMSize(var Message: TLMSize);
@@ -1904,6 +1907,17 @@ begin
   inc(Result.Top);
 end;
 
+procedure TvpGanttTasks.CalcGridVisibleRect;
+begin
+  {$ifdef DBGGANTTTASKS}
+  Form1.Debug('TvpGanttTasks.CalcGridVisibleRect');
+  {$endif}
+  FGridVisibleRect.Left := ClientRect.Left;
+  FGridVisibleRect.Top := ClientRect.Top + FvpGantt.GetTitleHeight;
+  FGridVisibleRect.Width := ClientWidth;
+  FGridVisibleRect.Height := Ceil(ClientHeight / FvpGantt.RowHeight)* FvpGantt.RowHeight;
+end;
+
 function TvpGanttTasks.CalcRowRect(aRow: integer): TRect;
 var
   aStart, aRowBorder: integer;
@@ -1916,12 +1930,12 @@ begin
   {DONE Рассчитать правую границу в соответствии с ClientWidth
         было FTasksWidth + aRowBorder - FHScrollPosition  стало ClientWidth}
   // -1 потому что рисуем обводку по контуру списка задач
-  aStart := FTitleHeight +
+  aStart := FvpGantt.GetTitleHeight +
             (FvpGantt.RowHeight + aRowBorder) * aRow - 1;
   tmpRect := Rect(0 - FHScrollPosition, aStart,
-                  ClientWidth - 1, aStart + FvpGantt.RowHeight + aRowBorder);
+                  FGridVisibleRect.Bottom -  1, aStart + FvpGantt.RowHeight + aRowBorder);
   //обрезаем невидимые части
-  IntersectRect(Result, tmpRect, ClientRect);
+  IntersectRect(Result, tmpRect, FGridVisibleRect);
 end;
 
 procedure TvpGanttTasks.CalcTasksWidth;
@@ -1943,17 +1957,7 @@ begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.CalcTasksHeight');
   {$EndIf}
-  FTasksHeight := FvpGantt.FIntervalsHeight;
-end;
-
-procedure TvpGanttTasks.CalcTitleHeight;
-begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.CalcTitleHeight');
-  {$endif}
-  if not Assigned(FvpGantt) then
-    Exit;
-  FTitleHeight := FvpGantt.GetTitleHeight;
+  FTasksHeight := FvpGantt.GetTitleHeight + FvpGantt.FIntervalsHeight;
 end;
 
 procedure TvpGanttTasks.CalcScrollbarsRange;
@@ -1991,7 +1995,7 @@ begin
   // Canvas.FrameRect(ClientRect);
 end;
 
-procedure TvpGanttTasks.DrawFocusRect(aRow: integer; aRect: TRect);
+procedure TvpGanttTasks.DrawFocusRect(aRow: integer; ARect: TRect);
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.DrawFocusRect');
@@ -2044,8 +2048,8 @@ begin
   {$ifdef DBGGANTTTASKS}
   Form1.EL.Debug('rRect.Left %d rRect.Top %d rRect.Right %d rRect.Bottom %d',
                   [rRect.Left, rRect.Top, rRect.Right, rRect.Bottom]);
-  Form1.EL.Debug('FHScrollPosition %d, ClientWidth %d, FTasksWidth %d',
-                  [FHScrollPosition, ClientWidth, FTasksWidth]);
+  Form1.EL.Debug('FHScrollPosition %d, ClientWidth %d, FGridVisibleRect.Height %d, FTasksWidth %d',
+                  [FHScrollPosition, ClientWidth, FGridVisibleRect.Height, FTasksWidth]);
   {$endif}
   if rRect.Height>0 then
     begin
@@ -2101,7 +2105,7 @@ begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.GetSBVisibility');
   {$endif}
-  AutoHorz := ScrollBarAutomatic(ssHorizontal);
+  AutoHorz := FvpGantt.ScrollBarAutomatic(ssHorizontal);
 
   // get client bounds free of bars
   ClientW  := ClientWidth;
@@ -2159,22 +2163,6 @@ begin
   DrawEdges;
   DrawTitle;
   DrawRows;
-end;
-
-function TvpGanttTasks.ScrollBarAutomatic(Which: TScrollStyle): boolean;
-begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.ScrollBarAutomatic');
-  {$EndIf}
-  result := false;
-  if (Which=ssVertical) OR (Which=ssHorizontal) then
-    begin
-      if Which=ssVertical then
-        Which := ssAutoVertical
-      else
-        Which := ssAutoHorizontal;
-      Result := FvpGantt.ScrollBars in [Which, ssAutoBoth];
-    end;
 end;
 
 function TvpGanttTasks.ScrollBarIsVisible(Which: Integer): Boolean;
@@ -2346,7 +2334,6 @@ begin
   Form1.EL.Debug('x %d y %d',[message.XPos, message.YPos]);
   {$endif}
   inherited;
-  //TODO Вычесть значение прокрутки по Y
   aRow := FvpGantt.GetRowPosY(message.YPos);
   if aRow>-1 then
     FvpGantt.SetFocusRow(aRow);
@@ -2394,8 +2381,6 @@ begin
 end;
 
 procedure TvpGantt.CalcIntervalsHeight;
-var
-  i: integer;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.CalcIntervalsHeight');
@@ -2479,7 +2464,8 @@ begin
   {$endif}
   if FFocusColor = AValue then Exit;
   FFocusColor := AValue;
-  //TODO Сделать обновление области с фокусом
+  //DONE Сделать обновление области с фокусом
+  RepaintFocus(FFocusRow);
 end;
 
 procedure TvpGantt.SetMajorScale(AValue: TvpTimeScale);
@@ -2724,6 +2710,22 @@ begin
     end;
 end;
 
+function TvpGantt.ScrollBarAutomatic(Which: TScrollStyle): boolean;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.ScrollBarAutomatic');
+  {$endif}
+  Result := false;
+  if (Which=ssVertical) OR (Which=ssHorizontal) then
+    begin
+      if Which=ssVertical then
+        Which:=ssAutoVertical
+      else
+        Which:=ssAutoHorizontal;
+      Result:= FScrollBars in [Which, ssAutoBoth];
+    end;
+end;
+
 procedure TvpGantt.VisualChange;
 begin
   {$ifdef DBGGANTT}
@@ -2845,10 +2847,10 @@ begin
   {$endif}
   if (FFocusRow=AValue) OR (AValue>=FIntervals.Count) then
     Exit;
-  {TODO -o Vas Сделать прокрутку к месту фокусировки}
   //стерли старый фокус
   RepaintFocus(FFocusRow);
   FFocusRow := AValue;
+  {TODO -o Vas Сделать прокрутку к месту фокусировки}
   //нарисовали новый
   RepaintFocus(FFocusRow);
 end;

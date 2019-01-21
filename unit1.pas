@@ -116,7 +116,7 @@ begin
       GInterval := TvpInterval.Create(GanttDiagram);
       GInterval.Name := '123456789abcdefghijklmnopqrstuvwxyz  ' + IntToStr(i) ;
       GInterval.StartDate := Now + i/60/60*i + 1;
-      GInterval.DueDate := Now + i/60/60*i + 50;
+      GInterval.DueDate := Now + i/60/60*i + 2;
       //GInterval.Visible := True;
       GanttDiagram.AddInterval(GInterval);
     end;
