@@ -1,7 +1,7 @@
 unit vpGantt;
 
 //{$define DBGINTERVAL}
-//{$define DBGGANTT}
+{$define DBGGANTT}
 {$define DBGGANTTTASKS}
 //{$define DBGGANTTCALENDAR}
 
@@ -324,7 +324,7 @@ type
       procedure DrawTitleGrid(ACanvas: TCanvas; aRect: TRect);
       procedure DrawTitleCell(ACanvas: TCanvas; aRect: TRect);
       procedure DrawTitleText(ACanvas: TCanvas; aRect: TRect; aText: string; aAligment: TAlignment = taLeftJustify);
-      function FixHScrollPosition(const ARange, APage, APos: integer): integer;
+      function FixScrollPosition(const ARange, APage, APos: integer): integer;
       procedure FontChanged(Sender: TObject); override;
       procedure Paint; override;
       procedure RepaintFocus(aFocusRow: integer);
@@ -936,6 +936,7 @@ procedure TvpGanttCalendar.CalcCalendarHeight;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.CalcCalendarHeight');
+  Form1.El.Debug('FvpGantt.IntervalCount=%d FvpGantt.GetIntervalsHeight=%d', [FvpGantt.IntervalCount, FvpGantt.GetIntervalsHeight]);
   {$endif}
   FCalendarHeight := FvpGantt.GetIntervalsHeight;
 end;
@@ -1181,7 +1182,7 @@ begin
   {$endif}
 
   ScrollBarPosition(SB_HORZ, aPos);
-  FHScrollPosition := FvpGantt.FixHScrollPosition(ScrollInfo.nMax, ScrollInfo.nPage, aPos);
+  FHScrollPosition := aPos;
 
   {$ifdef DBGGANTTCALENDAR}
   //Form1.Debug(Format('FScrollPosition %d', [FXScrollPosition]));
@@ -1191,10 +1192,78 @@ begin
 end;
 
 procedure TvpGanttCalendar.WMVScroll(var message: TLMVScroll);
+var
+  aPos, maxPos: Integer;
+  ScrollInfo: TScrollInfo;
+  aCode: Smallint;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.WMVScroll');
   {$endif}
+  if not HandleAllocated then
+    exit;
+
+  ScrollInfo.cbSize := SizeOf(ScrollInfo);
+  ScrollInfo.fMask := SIF_PAGE or SIF_RANGE or SIF_POS;
+  GetScrollInfo(Handle, SB_VERT, ScrollInfo);
+  maxPos := ScrollInfo.nMax - Max(ScrollInfo.nPage-1, 0);
+
+  aCode := message.ScrollCode;
+  aPos := ScrollInfo.nPos;
+
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug(Format('maxPos %d', [maxPos]));
+  Form1.Debug(Format('aPos %d', [aPos]));
+  {$endif}
+  case aCode of
+    SB_LEFT:
+      aPos := ScrollInfo.nMin;
+    SB_RIGHT:
+      aPos := maxPos;
+    // Scrolls one line left / right
+    SB_LINERIGHT:
+      if aPos < maxPos then
+        inc(aPos);
+    SB_LINELEFT:
+      if aPos > ScrollInfo.nMin then
+        dec(aPos);
+    // Scrolls one page of lines up / down
+    SB_PAGERIGHT:
+      begin
+        if (aPos + ScrollInfo.nPage)>maxPos then
+          aPos := maxPos
+        else
+          aPos := aPos + (ScrollInfo.nPage - 1);
+      end;
+    SB_PAGELEFT:
+      begin
+        if (aPos - ScrollInfo.nPage) < ScrollInfo.nMin then
+          aPos := ScrollInfo.nMin
+        else
+          aPos := aPos - (ScrollInfo.nPage + 1);
+      end;
+    // Scrolls to the current scroll bar position
+    SB_THUMBPOSITION:
+      aPos := message.Pos;
+    SB_THUMBTRACK:
+      aPos := message.Pos;
+    // Ends scrolling
+    SB_ENDSCROLL:
+      Exit;
+  end;
+
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug(Format('aPos %d', [aPos]));
+  {$endif}
+
+  ScrollBarPosition(SB_VERT, aPos);
+  FVScrollPosition := aPos;
+
+  {$ifdef DBGGANTTCALENDAR}
+  //Form1.Debug(Format('FVScrollPosition %d', [FVScrollPosition]));
+  {$endif}
+
+  Invalidate;
 end;
 
 procedure TvpGanttCalendar.WMLButtonDown(var message: TLMLButtonDown);
@@ -1237,7 +1306,7 @@ begin
   Form1.Debug('TvpGanttCalendar.CalcScrollbarsRange');
   {$endif}
   GetSBVisibility(HsbVisible, VsbVisible);
-  GetSBRanges(HsbVisible,VsbVisible,HsbRange,VsbRange,HsbPage,VsbPage,HsbPos,VsbPos);
+  GetSBRanges(HsbVisible, VsbVisible, HsbRange, VsbRange, HsbPage, VsbPage, HsbPos, VsbPos);
   UpdateVertScrollBar(VsbVisible, VsbRange, VsbPage, VsbPos);
   UpdateHorzScrollBar(HsbVisible, HsbRange, HsbPage, HsbPos);
 end;
@@ -1253,7 +1322,7 @@ begin
   if HandleAllocated then begin
     {$ifdef DBGGANTTCALENDAR}
     Form1.EL.Debug('ScrollbarRange: Which=%s Range=%d Page=%d Pos=%d',
-      [SbToStr(Which),aRange,aPage,aPos]);
+      [SbToStr(Which), aRange, aPage, aPos]);
     {$endif}
     FillChar(ScrollInfo, SizeOf(ScrollInfo), 0);
     ScrollInfo.cbSize := SizeOf(ScrollInfo);
@@ -1266,12 +1335,6 @@ begin
     if APage<0 then
       APage := 0;
     ScrollInfo.nPage := APage;
-    if (Which=SB_HORZ) and UseRightToLeftAlignment then begin
-      ScrollInfo.nPos := ScrollInfo.nMax-ScrollInfo.nPage-ScrollInfo.nPos;
-      {$ifdef DBGGANTTCALENDAR}
-      Form1.EL.Debug('ScrollbarRange: RTL nPos=%d',[ScrollInfo.nPos]);
-      {$endif}
-    end;
     SetScrollInfo(Handle, Which, ScrollInfo, True);
   end;
 end;
@@ -1293,14 +1356,6 @@ begin
     else vis := false;
     FillChar(ScrollInfo, SizeOf(ScrollInfo), 0);
     ScrollInfo.cbSize := SizeOf(ScrollInfo);
-    if (Which=SB_HORZ) and Vis and UseRightToLeftAlignment then begin
-      ScrollInfo.fMask := SIF_PAGE or SIF_RANGE;
-      GetScrollInfo(Handle, SB_HORZ, ScrollInfo);
-      Value := (ScrollInfo.nMax-ScrollInfo.nPage)-Value;
-      {$ifdef DBGGANTTCALENDAR}
-      Form1.EL.Debug('ScrollbarPosition: Which= %s RTL Value= %d', [SbToStr(Which), Value]);
-      {$endif}
-    end;
     ScrollInfo.fMask := SIF_POS;
     ScrollInfo.nPos:= Value;
     SetScrollInfo(Handle, Which, ScrollInfo, Vis);
@@ -1631,50 +1686,40 @@ begin
   AutoHorz := ScrollBarAutomatic(ssHorizontal);
 
   //// get client bounds free of bars
-  //ClientW  := ClientWidth;
-  //ClientH  := ClientHeight;
-  //BarW := GetSystemMetrics(SM_CXVSCROLL) +
-  //        GetSystemMetrics(SM_SWSCROLLBARSPACING);
-  //if ScrollBarIsVisible(SB_VERT) then
-  //  ClientW := ClientW + BarW;
-  //BarH := GetSystemMetrics(SM_CYHSCROLL) +
-  //        GetSystemMetrics(SM_SWSCROLLBARSPACING);
-  //if ScrollBarIsVisible(SB_HORZ) then
-  //  ClientH := ClientH + BarH;
-  //
-  //// first find out if scrollbars need to be visible by
-  //// comparing against client bounds free of bars
-  //HsbVisible := (FScrollBars in [ssHorizontal, ssBoth]) or
-  //              (AutoHorz and (FGCache.GridWidth>ClientW));
-  //
-  //VsbVisible := (FScrollBars in [ssVertical, ssBoth]) or
-  //              (AutoVert and (FGCache.GridHeight>ClientH));
-  //
-  //// then for automatic scrollbars check if grid bounds are
-  //// in some part of area occupied by scrollbars
-  //if not HsbVisible and AutoHorz and VsbVisible then
-  //  HsbVisible := FGCache.GridWidth  > (ClientW-BarW);
-  //
-  //if not VsbVisible and AutoVert and HsbVisible then
-  //  VsbVisible := FGCache.GridHeight > (ClientH-BarH);
-  //
-  //if AutoHorz then
-  //  HsbVisible := HsbVisible and not AutoFillColumns;
-  //
-  //// update new cached client values according to visibility
-  //// of scrollbars
-  //if HsbVisible then
-  //  FGCache.ClientHeight := ClientH - BarH;
-  //if VsbVisible then
-  //  FGCache.ClientWidth := ClientW - BarW;
-  //
-  //{$ifdef dbgscroll}
-  //DebugLn('TCustomGrid.GetSBVisibility:');
-  //DebugLn(['  Horz=',HsbVisible,' GW=',FGCache.GridWidth,
-  //  ' CW=',ClientWidth,' CCW=',FGCache.ClientWidth,' BarW=',BarW]);
-  //DebugLn(['  Vert=',VsbVisible,' GH=',FGCache.GridHeight,
-  //  ' CH=',ClientHeight,' CCH=',FGCache.ClientHeight,' BarH=',BarH]);
-  //{$endif}
+  ClientW  := ClientWidth;
+  ClientH  := ClientHeight;
+  BarW := GetSystemMetrics(SM_CXVSCROLL) +
+          GetSystemMetrics(SM_SWSCROLLBARSPACING);
+  if ScrollBarIsVisible(SB_VERT) then
+    ClientW := ClientW + BarW;
+  BarH := GetSystemMetrics(SM_CYHSCROLL) +
+          GetSystemMetrics(SM_SWSCROLLBARSPACING);
+  if ScrollBarIsVisible(SB_HORZ) then
+    ClientH := ClientH + BarH;
+
+  // first find out if scrollbars need to be visible by
+  // comparing against client bounds free of bars
+  HsbVisible := (FvpGantt.FScrollBars in [ssHorizontal, ssBoth]) or
+                (AutoHorz and (FCalendarWidth>ClientW));
+
+  VsbVisible := (FvpGantt.FScrollBars in [ssVertical, ssBoth]) or
+                (AutoVert and (FCalendarHeight>ClientH));
+
+  // then for automatic scrollbars check if grid bounds are
+  // in some part of area occupied by scrollbars
+  if not HsbVisible and AutoHorz and VsbVisible then
+    HsbVisible := FCalendarWidth > (ClientW - BarW);
+
+  if not VsbVisible and AutoVert and HsbVisible then
+    VsbVisible := FCalendarHeight > (ClientH - BarH);
+
+  if AutoHorz then
+    HsbVisible := HsbVisible; // and not AutoFillColumns;
+
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.El.Debug('Horz=%d CalendarW=%d CW=%d BarW=%d', [Integer(HsbVisible), FCalendarWidth, ClientWidth, BarW]);
+  Form1.El.Debug('Vert=%d CalendarH=%d CH=%d BarH=%d', [Integer(VsbVisible), FCalendarHeight, ClientHeight, BarH]);
+  {$endif}
 end;
 
 procedure TvpGanttCalendar.GetSBRanges(const HsbVisible, VsbVisible: boolean;
@@ -1687,24 +1732,21 @@ begin
   HsbPos := 0;
   if HsbVisible then
     begin
-      HsbRange := Max(0, FCalendarWidth - ClientWidth);
-      HsbPage := Min(SCROLL_PAGE_DEFAULT, FCalendarWidth - ClientWidth - 1);
+      HsbRange := FCalendarWidth;
+      HsbPage := ClientWidth;
     end;
 
   VsbRange := 0;
   VsbPos := 0;
   if VsbVisible then
     begin
-      VsbRange := Max(0, FCalendarHeight - ClientHeight);
-      VsbPage := Min(SCROLL_PAGE_DEFAULT, FCalendarHeight - ClientHeight - 1);
+      VsbRange := FCalendarHeight - (GetMajorScaleHeight + GetMinorScaleWidth);
+      VsbPage := ClientHeight - (GetMajorScaleHeight + GetMinorScaleWidth);
     end;
-
-  HsbPage := ClientWidth;
-  VSbPage := ClientHeight;
 
   {$ifdef DBGGANTTCALENDAR}
   Form1.EL.Debug('GetSBRanges: HRange=%d HPage=%d HPos=%d VRange=%d VPage=%d VPos=%d',
-    [HSbRange,HsbPage,HsbPos, VsbRange, VsbPage, VsbPos]);
+    [HSbRange, HsbPage, HsbPos, VsbRange, VsbPage, VsbPos]);
   {$endif}
 end;
 
@@ -1727,6 +1769,8 @@ begin
   {$endif}
   inherited create(AOwner);
   FvpGantt := AOwner;
+  FHScrollPosition := 0;
+  FVScrollPosition := 0;
 
   FMajorScale := vptsMonth;
   FMinorScale := vptsDay;
@@ -1875,7 +1919,7 @@ begin
   aStart := FTitleHeight +
             (FvpGantt.RowHeight + aRowBorder) * aRow - 1;
   tmpRect := Rect(0 - FHScrollPosition, aStart,
-                 Self.ClientWidth - 1, aStart + FvpGantt.RowHeight + aRowBorder);
+                  ClientWidth - 1, aStart + FvpGantt.RowHeight + aRowBorder);
   //обрезаем невидимые части
   IntersectRect(Result, tmpRect, ClientRect);
 end;
@@ -1998,7 +2042,10 @@ begin
   if not Assigned(FvpGantt) then Exit;
   rRect := CalcRowRect(aRow);
   {$ifdef DBGGANTTTASKS}
-  Form1.EL.Debug('rRect.Top %d  rRect.Height %d', [rRect.top, rRect.Height]);
+  Form1.EL.Debug('rRect.Left %d rRect.Top %d rRect.Right %d rRect.Bottom %d',
+                  [rRect.Left, rRect.Top, rRect.Right, rRect.Bottom]);
+  Form1.EL.Debug('FHScrollPosition %d, ClientWidth %d, FTasksWidth %d',
+                  [FHScrollPosition, ClientWidth, FTasksWidth]);
   {$endif}
   if rRect.Height>0 then
     begin
@@ -2077,10 +2124,9 @@ begin
   if AutoHorz then
     HsbVisible := HsbVisible; // and not AutoFillColumns;
 
-  // update new cached client values according to visibility
-  // of scrollbars
-  if HsbVisible then
-    FTasksHeight := ClientH - BarH;
+  {$ifdef DBGGANTTTASKS}
+  Form1.El.Debug('Horz=%d TasksH=%d CH=%d BarH=%d', [Integer(HsbVisible), FTasksHeight, ClientHeight, BarH]);
+  {$endif}
 end;
 
 procedure TvpGanttTasks.GetSBRanges(const HsbVisible: boolean; out
@@ -2094,9 +2140,10 @@ begin
   HsbPos := 0;
   if HsbVisible then
     begin
-      HsbRange := Max(0, FTasksWidth - ClientWidth);
-      HsbPage := Min(SCROLL_PAGE_DEFAULT, FTasksWidth - ClientWidth - 1);
+      HsbRange := FTasksWidth;
+      HsbPage := ClientWidth;
     end;
+
   {$ifdef DBGGANTTTASKS}
   Form1.Debug(Format('HsbRange %d', [HsbRange]));
   Form1.Debug(Format('FTasksWidth %d', [FTasksWidth]));
@@ -2276,12 +2323,14 @@ begin
 
   {$ifdef DBGGANTTTASKS}
   Form1.Debug(Format('aPos %d', [aPos]));
+  Form1.Debug(Format('FHScrollPosition %d', [FHScrollPosition]));
   {$endif}
 
   ScrollBarPosition(SB_HORZ, aPos);
-  FHScrollPosition := FvpGantt.FixHScrollPosition(ScrollInfo.nMax, ScrollInfo.nPage, aPos);
+  FHScrollPosition := aPos;
 
   {$ifdef DBGGANTTTASKS}
+  Form1.Debug(Format('FHScrollPosition %d', [FHScrollPosition]));
   Form1.Debug(Format('FHScrollPosition %d', [FHScrollPosition]));
   {$endif}
 
@@ -2351,9 +2400,7 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.CalcIntervalsHeight');
   {$EndIf}
-  FIntervalsHeight := 0;
-  for i:=0 to IntervalCount-1 do
-    FIntervalsHeight := FIntervalsHeight + RowHeight;
+  FIntervalsHeight := IntervalCount * RowHeight;
 end;
 
 function TvpGantt.GetIntervalsHeight: integer;
@@ -2682,6 +2729,7 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.VisualChange INIT');
   {$endif}
+  CalcIntervalsHeight;
   if (FUpdateCount=0) AND HandleAllocated then
     begin
       {$ifdef DBGGANTT}
@@ -2695,8 +2743,6 @@ begin
 end;
 
 procedure TvpGantt.WMKillFocus(var message: TLMKillFocus);
-var
-  R: TRect;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.WMKillFocus');
@@ -3158,7 +3204,7 @@ var
 begin
   {TODO -o Vas Попробовать сделать для первого диапазона не прокручивающуюся надпись  }
   {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.DrawTitleCell');
+  Form1.Debug('TvpGantt.DrawTitleText');
   {$endif}
   //рисуем названия
   //SetBkMode(ACanvas.Handle, TRANSPARENT);
@@ -3169,7 +3215,7 @@ begin
   ACanvas.TextRect(textRect, textRect.Left, textRect.Top, aText, aTextStyle);
 end;
 
-function TvpGantt.FixHScrollPosition(const ARange, APage, APos: integer): integer;
+function TvpGantt.FixScrollPosition(const ARange, APage, APos: integer): integer;
 var
   maxPos: integer;
 begin
@@ -3180,7 +3226,13 @@ begin
   //коэффициент отношения размера скрытой области к значениям положения ползунка
   //ну, а в конце поправить неточность округления
   maxPos := aRange - MAX(APage - 1, 0);
+  {$ifdef DBGGANTT}
+  Form1.Debug(Format('maxPos %d', [maxPos]));
+  {$endif}
   Result := Ceil(aRange/maxPos*aPos);
+  {$ifdef DBGGANTT}
+  Form1.Debug(Format('Result %d', [Result]));
+  {$endif}
   //if APos = maxPos then
   //  inc(FXScrollPosition, 2*constCellPadding + 2*FvpGantt.GetBorderWidth);
 end;

@@ -104,7 +104,7 @@ begin
   GanttDiagram := TvpGantt.Create(Self);
   GanttDiagram.Parent := Panel3;
   GanttDiagram.Align := alClient;
-  GanttDiagram.ScrollBars := ssBoth;
+  GanttDiagram.ScrollBars := ssAutoBoth;
   GanttDiagram.BorderStyle := bsSingle;
   GanttDiagram.TaskTitleCaption := 'Проекты';
   GanttDiagram.MajorScale := vptsMonth;
@@ -114,9 +114,9 @@ begin
   for i:=0 to 25 do
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
-      GInterval.Name := 'aaassadsfsdfgdsfgdsgsdfgdfsdfsdaaassadsfsdfgdsfgdsgsdfgdfsdfsdaaassads  ' + IntToStr(i) ;
+      GInterval.Name := '123456789abcdefghijklmnopqrstuvwxyz  ' + IntToStr(i) ;
       GInterval.StartDate := Now + i/60/60*i + 1;
-      GInterval.DueDate := Now + i/60/60*i + 2;
+      GInterval.DueDate := Now + i/60/60*i + 50;
       //GInterval.Visible := True;
       GanttDiagram.AddInterval(GInterval);
     end;
