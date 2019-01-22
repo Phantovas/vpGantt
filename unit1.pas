@@ -95,7 +95,7 @@ end;
 
 procedure TForm1.FormShow(Sender: TObject);
 var
-  i, j: integer;
+  i: integer;
   //LInterval: TInterval;
   GInterval: TvpInterval;
 begin
@@ -115,8 +115,8 @@ begin
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
       GInterval.Name := IntToStr(i) + '  123456789abcdefghijklmnopqrstuvwxyz' ;
-      GInterval.StartDate := Now + i/60/60*i + 1;
-      GInterval.DueDate := Now + i/60/60*i + 2;
+      GInterval.SrartDate := Now + i/60/60*i + 1;
+      GInterval.FinishDate := Now + i/60/60*i + 2;
       //GInterval.Visible := True;
       GanttDiagram.AddInterval(GInterval);
     end;

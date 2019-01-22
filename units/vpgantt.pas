@@ -3,13 +3,13 @@ unit vpGantt;
 {
   TODO -o Vas :
   1. Поравить отрисовку бордера в гриде, рисоват надо внутри ячейки
-
+  2. Интервалы сделать как коллекцию. С возможностью задания для каждого интервала своих свойств
 }
 
 
-//{$define DBGINTERVAL}
+{$define DBGINTERVAL}
 //{$define DBGGANTT}
-{$define DBGGANTTTASKS}
+//{$define DBGGANTTTASKS}
 //{$define DBGGANTTCALENDAR}
 
 interface
@@ -79,9 +79,9 @@ resourcestring
   RS_TITLE_TASKS = 'Задача';
   //Scale
   RS_E_MAJORSCALE_LOW = 'MajorScale should by higher than MinorScale';
-  RS_E_MAJORSCALE_DIFF = 'MajorScale should by different from MinorScale';
+  RS_E_MAJORSCALE_EQUAL = 'MajorScale should by different from MinorScale';
   RS_E_MINORSCALE_HIGH = 'MinorScale should by lower than MajorScale';
-  RS_E_MINORSCALE_DIFF = 'MinorScale should by different from MajorScale';
+  RS_E_MINORSCALE_EQUAL = 'MinorScale should by different from MajorScale';
   //date
   RS_HOUR = 'ч.';
   RS_WEEK = 'Нед. ';
@@ -101,11 +101,8 @@ type
     FProject: string;
     FFinishDate: TDateTime;
     FStartDate: TDateTime;
-    FPlan: Double;
+    FDuration: Double;
   public
-    property StartDate : TDateTime read FStartDate write FStartDate;
-    property DueDate : TDateTime read FFinishDate write FFinishDate;
-    property PlanTime : Double read FPlan write FPlan;
     property Name : string read FName write FName;
     property Project : string read FProject write FProject;
     property Resource : string read FResource write FResource;
@@ -116,10 +113,21 @@ type
   TvpInterval = class(TvpBaseInterval)
     private
       FvpGantt: TvpGantt;
+      FPlanRect: TRect;  //область планируемого времени
+      FDurationRect: TRect;  //область фактического времени
+      procedure SetFinishDate(AValue: TDateTime);
+      procedure SetStartDate(AValue: TDateTime);
     protected
+      procedure CalcPlanBound;
+      procedure CalcDurationBound;
     public
       constructor Create(AvpGantt: TvpGantt); virtual;
       destructor Destroy; override;
+
+      procedure UpdateBounds;
+    published
+      property SrartDate: TDateTime read FStartDate write SetStartDate;
+      property FinishDate: TDateTime read FFinishDate write SetFinishDate;
   end;
 
   { TvpGanttTasks }
@@ -295,6 +303,7 @@ type
       function GetIntervalCount: Integer;
       function GetInterval(AnIndex: Integer): TvpInterval;
       function GetBorderWidth: integer;
+      function GetIntervalIndex: integer;
       function GetMajorScale: TvpTimeScale;
       function GetMinorScale: TvpTimeScale;
       function GetPixelPerMinorScale: integer;
@@ -320,7 +329,6 @@ type
       procedure SetTitleColor(AValue: TColor);
       procedure SetTitleFont(const AValue: TFont);
       procedure SetTitleStyle(const AValue: TTitleStyle);
-      procedure SetFocus; override;
       procedure VisualChange;
       procedure WMKillFocus(var message: TLMKillFocus); message LM_KILLFOCUS;
     protected
@@ -338,7 +346,7 @@ type
       procedure DrawTitleGrid(ACanvas: TCanvas; aRect: TRect);
       procedure DrawTitleCell(ACanvas: TCanvas; aRect: TRect);
       procedure DrawTitleText(ACanvas: TCanvas; aRect: TRect; aText: string; aAligment: TAlignment = taLeftJustify);
-      function FixScrollPosition(const ARange, APage, APos: integer): integer;
+      function FixScrollPosition(const ARange, APage, APos: integer): integer; deprecated;
       procedure FontChanged(Sender: TObject); override;
       procedure Paint; override;
       procedure RepaintFocus(aFocusRow: integer);
@@ -348,8 +356,9 @@ type
     public
       constructor Create(AOwner: TComponent); override;
       destructor Destroy; override;
-
+      //property
       property Interval[Index: Integer]: TvpInterval read GetInterval;
+      property IntervalIndex: integer read GetIntervalIndex;
       property IntervalCount: Integer read GetIntervalCount;
       procedure AddInterval(AnInterval: TvpInterval);
       procedure InsertInterval(AnIndex: Integer; AnInterval: TvpInterval);
@@ -357,12 +366,16 @@ type
       procedure RemoveInterval(AnInterval: TvpInterval);
       procedure UpdateInterval(AUpdateDate: boolean = false);
 
+      function GetStartIntervalDate: TDateTime;
+      function GetEndIntervalDate: TDateTime;
+
       procedure BeginUpdate;
       procedure EndUpdate(aRefresh: boolean = true);
 
       procedure First;
       procedure Last;
       procedure MoveTo(ARow: integer);
+      procedure SetFocus; override;
       property FocusColor: TColor read FFocusColor write SetFocusColor default clBlack;
     published
       //standart TwinControl property
@@ -407,7 +420,6 @@ implementation
 uses Unit1;
 
 {$if Defined(DBGGANTT) OR Defined(DBGGANTTTASKS) OR Defined(DBGGANTTCALENDAR)}
-
 function SbToStr(Which: Integer): string;
 begin
   case Which of
@@ -420,8 +432,7 @@ begin
 end;
 {$endif}
 
-{
-  Процедура прорисовки квадратика активного фокуса в окне.
+{ Процедура прорисовки квадратика активного фокуса в окне.
   Взято из модуля Grids, почему не используется функция WinAPI DrawFocusRect могу только догадыватся.
   И это скорее всего связано с кроссплатформенностью, данный компонент ее не поддерживает, надеюсь пока.
   А функция уже реализована, потому будем юзать её.
@@ -465,8 +476,7 @@ begin
   end;
 end;
 
-{
-  Получаем рабочий канвас, если он не существует или =0 то получаем указатель
+{ Получаем рабочий канвас, если он не существует или =0 то получаем указатель
   на рабочий стол
   @param Canvas TCanvas нужная канва
   @return TCanvas указатель на канву или рабочий стол
@@ -485,8 +495,7 @@ begin
     Result := Canvas;
 end;
 
-{
-  Освобождаем рабочую канву
+{ Освобождаем рабочую канву
   @param Canvas TCanvas нужная канва
 }
 procedure FreeWorkingCanvas(canvas: TCanvas);
@@ -495,8 +504,7 @@ begin
   Canvas.Free;
 end;
 
-{
-  Функция определения количества временных интервалов между двумя датами
+{ Функция определения количества временных интервалов между двумя датами
   @param Start TDateTime начальное время
   @param Finish TDateTime конечное время
   @param TimeScale TvpTimeScale тип временной шкалы см. TvpTimeScale
@@ -527,8 +535,7 @@ begin
   end;
 end;
 
-{
-  Функция определения количества временных интервалов между двумя датами с
+{ Функция определения количества временных интервалов между двумя датами с
   использованием приведения времени к юниксовскому формату
   @param Start TDateTime начальное время
   @param Finish TDateTime конечное время
@@ -644,8 +651,7 @@ begin
   end;
 end;
 
-{
-  Функция возвращает название временной шкалы
+{ Функция возвращает название временной шкалы
   @param TimeScale TvpTimeScale тип временной шкалы
   @param D TDateTime время
   @return string название временного интервала (Пн. Вт, Январь, Ферваль, и т.д.)
@@ -668,7 +674,7 @@ begin
     vptsDay:
       Result := IntToStr(Day);
     vptsDayWeek:
-      Result := ShortDayNames[DayOfWeek(D)];
+      Result := DefaultFormatSettings.ShortDayNames[DayOfWeek(D)];
     vptsWeek:
       Result := IntToStr(Day) + '.' + IntToStr(Month);
     vptsWeekNum:
@@ -676,7 +682,7 @@ begin
     vptsWeekNumPlain:
       Result := IntToStr(WeekOfTheYear(D));
     vptsMonth:
-      Result := LongMonthNames[Month] + ' ' + IntToStr(Year);
+      Result := DefaultFormatSettings.LongMonthNames[Month] + ' ' + IntToStr(Year);
     vptsQuarter:
       Result := RS_KW + IntToStr((Month) div 3 + 1);
     vptsHalfYear:
@@ -686,8 +692,7 @@ begin
   end;
 end;
 
-{
-  Функция сдвига времени на нужный интервал. Будеи использовать для получения даты
+{ Функция сдвига времени на нужный интервал. Будеи использовать для получения даты
   и передачи ее в функцию получения названия текущего периода.
   Например, стартовая дата 01.01.2000 года, диапазон старшей шкалы месяцы, значит первая дата
   будет 01.01.2000 для нее получим название "Январь", для получения следующей даты
@@ -867,21 +872,108 @@ end;
 
 { TvpInterval }
 
+procedure TvpInterval.SetStartDate(AValue: TDateTime);
+begin
+  {$ifdef DBGINTERVAL}
+  Form1.Debug('TvpInterval.SetStartDate');
+  {$endif}
+  if FStartDate = AValue then Exit;
+  FStartDate := AValue;
+  //расчитываем области
+  CalcPlanBound;
+end;
+
+procedure TvpInterval.SetFinishDate(AValue: TDateTime);
+begin
+  {$ifdef DBGINTERVAL}
+  Form1.Debug('TvpInterval.SetFinishDate');
+  {$endif}
+  if FFinishDate = AValue then Exit;
+  FFinishDate := AValue;
+  //расчитываем области
+  CalcDurationBound;
+end;
+
+{ Процедура расчета области планируемой длительности интервала
+  Рассчитываем левую границу всегда. А вот правую считаем только если задана положительная
+  продолжительность
+}
+procedure TvpInterval.CalcPlanBound;
+var
+  countTimeScale: double;
+begin
+  {$ifdef DBGINTERVAL}
+  Form1.Debug('TvpInterval.CalcLeftPlanBound');
+  {$endif}
+  countTimeScale := UnitsBetweenDates(FvpGantt.GetStartIntervalDate, FStartDate, FvpGantt.MinorScale);
+  FPlanRect.Left := Trunc(countTimeScale * FvpGantt.PixelPerMinorScale);
+  if FDuration>0 then
+    begin
+      countTimeScale := UnitsBetweenDates(FStartDate, FStartDate + FDuration, FvpGantt.MinorScale);
+      FPlanRect.Width := Trunc(countTimeScale * FvpGantt.PixelPerMinorScale);
+    end
+  else
+    FPlanRect.Width := 0;
+  {$ifdef DBGINTERVAL}
+  Form1.EL.Debug('FPlanRect LTRB %d %d %d %d', [FPlanRect.Left, FPlanRect.Top, FPlanRect.Right, FPlanRect.Bottom]);
+  {$endif}
+end;
+
+{ Процедура расчета области фактической длительности интервала
+  Рассчитываем только в случае, если задана дата окончания интервала и она больше даты начала
+}
+procedure TvpInterval.CalcDurationBound;
+var
+  countTimeScale: Double;
+begin
+  {$ifdef DBGINTERVAL}
+  Form1.Debug('TvpInterval.CalcRightDueBound');
+  {$endif}
+  if FFinishDate>FStartDate then
+    begin
+      FDurationRect.Left := FPlanRect.Left;
+      countTimeScale := UnitsBetweenDates(FStartDate, FFinishDate, FvpGantt.MinorScale);
+      FDurationRect.Width := Trunc(countTimeScale * FvpGantt.PixelPerMinorScale);
+    end;
+  {$ifdef DBGINTERVAL}
+  Form1.EL.Debug('FDurationRect LTRB %d %d %d %d', [FDurationRect.Left, FDurationRect.Top, FDurationRect.Right, FDurationRect.Bottom]);
+  {$endif}
+end;
+
+{ Конструктор
+}
 constructor TvpInterval.Create(AvpGantt: TvpGantt);
 begin
-  {$ifdef DBGGANTTCALENDAR}
+  {$ifdef DBGINTERVAL}
   Form1.Debug('TvpInterval.Create');
   {$endif}
   FvpGantt := AvpGantt;
   //initialize
+  FPlanRect := Rect(0, 0, 0, 0);
+  FDurationRect := Rect(0, 0, 0, 0);
 end;
 
+{ Разрушитель :)
+}
 destructor TvpInterval.Destroy;
 begin
-  {$ifdef DBGGANTTCALENDAR}
+  {$ifdef DBGINTERVAL}
   Form1.Debug('TvpInterval.Destroy');
   {$endif}
   inherited Destroy;
+end;
+
+{ Процедура пересчета границ интервала. Если сделаны изменения шкал, дат и кол-ва интервало
+  то следует вызвать для каждого интервала данную процедуру, чтобы не тратить время на расчет при
+  прорисовке календаря
+}
+procedure TvpInterval.UpdateBounds;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.ScrollBarShow');
+  {$endif}
+  CalcPlanBound;
+  CalcDurationBound;
 end;
 
 { TvpGanttCalendar }
@@ -2558,7 +2650,7 @@ begin
   else if AValue < FvpGanttCalendar.FMinorScale then
     raise Exception.Create(RS_E_MAJORSCALE_LOW)
   else if AValue = FvpGanttCalendar.FMinorScale then
-    raise Exception.Create(RS_E_MAJORSCALE_DIFF)
+    raise Exception.Create(RS_E_MAJORSCALE_EQUAL)
   else
     begin
       FvpGanttCalendar.FMajorScale := AValue;
@@ -2578,7 +2670,7 @@ begin
   else if AValue > FvpGanttCalendar.FMajorScale then
     raise Exception.Create(RS_E_MINORSCALE_HIGH)
   else if AValue = FvpGanttCalendar.FMajorScale then
-    raise Exception.Create(RS_E_MINORSCALE_DIFF)
+    raise Exception.Create(RS_E_MINORSCALE_EQUAL)
   else
     begin
       FvpGanttCalendar.FMinorScale := AValue;
@@ -2842,8 +2934,19 @@ begin
     Result := 0;
 end;
 
+function TvpGantt.GetIntervalIndex: integer;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.GetIntervalIndex');
+  {$endif}
+  Result := FFocusRow;
+end;
+
 function TvpGantt.GetMajorScale: TvpTimeScale;
 begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.GetMajorScale');
+  {$endif}
   if not FvpGanttCalendar.HandleAllocated then
     Result := vptsDay
   else
@@ -2852,11 +2955,17 @@ end;
 
 function TvpGantt.GetMajorScaleHeight: integer;
 begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.GetMajorScaleHeight');
+  {$endif}
   Result := FMajorScaleHeight;
 end;
 
 function TvpGantt.GetMinorScale: TvpTimeScale;
 begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.GetMinorScale');
+  {$endif}
   if not FvpGanttCalendar.HandleAllocated then
     Result := vptsHour
   else
@@ -2865,14 +2974,40 @@ end;
 
 function TvpGantt.GetPixelPerMinorScale: integer;
 begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.GetPixelPerMinorScale');
+  {$endif}
   if FvpGanttCalendar.HandleAllocated then
     Result := FvpGanttCalendar.FPixelePerMinorScale
   else
     Result := C_DEF_PIXEL_PER_MINOR;
 end;
 
+function TvpGantt.GetStartIntervalDate: TDateTime;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.GetStartIntervalDate');
+  {$endif}
+  if not FvpGanttCalendar.HandleAllocated then
+    Exit;
+  Result := FvpGanttCalendar.FStartIntervalDate;
+end;
+
+function TvpGantt.GetEndIntervalDate: TDateTime;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.GetEndIntervalDate');
+  {$endif}
+  if not FvpGanttCalendar.HandleAllocated then
+    Exit;
+  Result := FvpGanttCalendar.FEndIntervalDate;
+end;
+
 function TvpGantt.GetMinorScaleHeight: integer;
 begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.GetMajorScale');
+  {$endif}
   Result := FMinorScaleHeight;
 end;
 
@@ -2922,11 +3057,20 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetFocusRow');
   {$endif}
-  if (FFocusRow=AValue) OR (AValue>=FIntervals.Count) then
+  if (FFocusRow=AValue) then
     Exit;
   //стерли старый фокус
   RepaintFocus(FFocusRow);
-  FFocusRow := AValue;
+  //если список пустой или AValue = -1
+  if IntervalCount=0 then
+    begin
+      FFocusRow := -1;
+      Exit
+    end;
+  if AValue>IntervalCount then
+    FFocusRow := IntervalCount - 1
+  else
+    FFocusRow := AValue;
   //рассчитали новую область фокуса
   CalcFocusRect;
   if (FUpdateCount=0) AND (FvpGanttCalendar.HandleAllocated) then
@@ -3124,6 +3268,8 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.UpdateInterval');
   {$endif}
+  if IntervalCount=0 then
+    SetFocusRow(-1);
   //изменяются даты, пересчитаем только в случае если календарь создан
   if AUpdateDate then
     if FvpGanttCalendar.HandleAllocated then
