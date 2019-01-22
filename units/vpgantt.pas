@@ -1,5 +1,12 @@
 unit vpGantt;
 
+{
+  TODO -o Vas :
+  1. Поравить отрисовку бордера в гриде, рисоват надо внутри ячейки
+
+}
+
+
 //{$define DBGINTERVAL}
 //{$define DBGGANTT}
 {$define DBGGANTTTASKS}
@@ -126,11 +133,12 @@ type
       FTasksHeight: integer; //нужно для хранения высоты всей области
       FTitleHeight: integer;
       FGridVisibleRect: TRect; //область видимых строк
+      FGridTextHeight: integer;
       //scrollbars
       FHScrollPosition: integer;
       FHSbVisible: boolean;
       //methods
-      function CalcFocusRect(var aRect: TRect): TRect;
+      function CalcFocusRect: TRect;
       procedure CalcGridVisibleRect;
       function CalcRowRect(aRow: integer): TRect;
       procedure CalcTasksWidth;
@@ -187,20 +195,20 @@ type
       FMajorScaleTitleRect: TRect;
       FMinorScaleTitleRect: TRect;
       FPixelePerMinorScale: integer;
+      FGridTextHeight: integer;
 
       FStartIntervalDate: TDateTime;
       FEndIntervalDate: TDateTime;
 
       //scrollbars
       FHScrollPosition: integer;
-      FVScrollPosition: integer;
       FVSbVisible: boolean;
       FHSbVisible: boolean;
       //methods
       procedure CalcCalendarHeight;
       procedure CalcCalendarWidth;
       procedure CalcGridVisibleRect;
-      function CalcFocusRect(ARect: TRect): TRect;
+      function CalcFocusRect: TRect;
       function CalcRowRect(const aRow: integer): TRect;
       procedure CalcScaleCount;
       function GetMajorScaleHeight: integer;
@@ -256,7 +264,9 @@ type
       FvpGanttCalendar: TvpGanttCalendar;
       FSplitter: TSplitter;
       FScrollBars: TScrollStyle;
+      FVScrollPosition: integer;
       FGanttFocused: boolean;
+      FFocusRect: TRect;
 
       FIntervals: TList;
 
@@ -314,6 +324,7 @@ type
       procedure WMKillFocus(var message: TLMKillFocus); message LM_KILLFOCUS;
     protected
       procedure CalcIntervalsHeight;
+      procedure CalcFocusRect;
       function GetIntervalsHeight: integer; //высота всех интервалов
       function GetFocusRow: integer;
       function GetMajorScaleHeight: integer;
@@ -897,12 +908,12 @@ begin
   aRowBorder := FvpGantt.GetBorderWidth;
   // -1 потому что рисуем обводку по контуру календаря
   aStart := FvpGantt.MajorScaleHeight + FvpGantt.MinorScaleHeight +
-            (FvpGantt.RowHeight + aRowBorder) * aRow - 1;
+            (FvpGantt.RowHeight + aRowBorder) * aRow - FvpGantt.FVScrollPosition - 1;
   //находим всю длину строки
   tmpRect := Rect(0 - FHScrollPosition, aStart,
                  FCalendarWidth + aRowBorder - FHScrollPosition  - 1, aStart + FvpGantt.RowHeight + aRowBorder);
   //обрезаем невидимые части
-  {TODO -o Vas Пофиксить обрезку части строки внизу, иначе выводится черти-что}
+  {DONE -o Vas Пофиксить обрезку части строки внизу, иначе выводится черти-что}
   IntersectRect(Result, tmpRect, FGridVisibleRect);
 end;
 
@@ -952,17 +963,17 @@ begin
   FGridVisibleRect.Height := Ceil(ClientHeight / FvpGantt.RowHeight)* FvpGantt.RowHeight;
 end;
 
-function TvpGanttCalendar.CalcFocusRect(ARect: TRect): TRect;
+function TvpGanttCalendar.CalcFocusRect: TRect;
 begin
   {$ifdef TvpGanttCalendar}
   Form1.Debug('TvpGanttCalendar.CalcFocusRect');
   {$endif}
-  Result := aRect;
+  Result := FvpGantt.FFocusRect;
   Result.Left := Max(Result.Left, ClientRect.Left);
   Result.Right := Min(Result.Right, ClientRect.Right);
-  inc(Result.Left);
-  //InflateRect(Result, -2, -2);
-  inc(Result.Top, 1);
+  InflateRect(Result, -1, 0);
+  //срезаем невидимую часть области
+  IntersectRect(Result, Result, FGridVisibleRect);
 end;
 
 function TvpGanttCalendar.GetMajorScaleHeight: integer;
@@ -1014,6 +1025,7 @@ begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.UpdateSizes');
   {$endif}
+  FGridTextHeight := Canvas.GetTextHeight('A');
   CalcCalendarHeight;
   CalcCalendarWidth;
   CalcScrollbarsRange;
@@ -1261,13 +1273,14 @@ begin
   {$endif}
 
   ScrollBarPosition(SB_VERT, aPos);
-  FVScrollPosition := aPos;
+  FvpGantt.FVScrollPosition := aPos;
 
   {$ifdef DBGGANTTCALENDAR}
   //Form1.Debug(Format('FVScrollPosition %d', [FVScrollPosition]));
   {$endif}
 
-  Invalidate;
+  FvpGantt.CalcFocusRect;
+  FvpGantt.Invalidate;
 end;
 
 procedure TvpGanttCalendar.WMLButtonDown(var message: TLMLButtonDown);
@@ -1630,7 +1643,7 @@ begin
       if aRow=FvpGantt.GetFocusRow then
         begin
           //если строку подсвечивать
-          fRect := CalcFocusRect(rRect);
+          fRect := CalcFocusRect;
           FvpGantt.DrawHighlightRect(Canvas, fRect);
           DrawFocusRect(aRow, fRect);
         end;
@@ -1660,6 +1673,9 @@ begin
                         rRect.Bottom);
         end;
       ////считаем сдвиг и выводим текст
+      //textPoint.X := rRect.Left + constCellPadding - FHScrollPosition;
+      //textPoint.Y := rRect.Bottom - FGridTextHeight - (FvpGantt.RowHeight - FGridTextHeight) div 2;
+      //Canvas.TextRect(rRect, textPoint.X, textPoint.Y, FvpGantt.Interval[aRow].Name);
       //rRect.Top := Round(rRect.Top + (rRect.Height - Canvas.TextHeight('A'))/2);
       //Canvas.TextRect(rRect, rRect.Left + constCellPadding, rRect.Top, FvpGantt.Interval[aRow].Name);
     end;
@@ -1743,8 +1759,8 @@ begin
   VsbPos := 0;
   if VsbVisible then
     begin
-      VsbRange := FCalendarHeight - (GetMajorScaleHeight + GetMinorScaleWidth);
-      VsbPage := ClientHeight - (GetMajorScaleHeight + GetMinorScaleWidth);
+      VsbRange := FCalendarHeight ;
+      VsbPage := ClientHeight - FvpGantt.GetTitleHeight;
     end;
 
   {$ifdef DBGGANTTCALENDAR}
@@ -1773,7 +1789,6 @@ begin
   inherited create(AOwner);
   FvpGantt := AOwner;
   FHScrollPosition := 0;
-  FVScrollPosition := 0;
 
   FMajorScale := vptsMonth;
   FMinorScale := vptsDay;
@@ -1797,6 +1812,7 @@ begin
   {$endif}
   if HandleAllocated then
     begin
+      FGridTextHeight := Canvas.GetTextHeight('A');
       CalcTasksHeight;
       CalcTasksWidth;
       CalcScrollbarsRange;
@@ -1895,16 +1911,17 @@ begin
     end;
 end;
 
-function TvpGanttTasks.CalcFocusRect(var aRect: TRect): TRect;
+function TvpGanttTasks.CalcFocusRect: TRect;
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.CalcFocusRect');
   {$endif}
-  Result := aRect;
-  Result.Left := 0;
+  Result := FvpGantt.FFocusRect;
+  Result.Left := ClientRect.Left;
   Result.Right := Min(Result.Right, ClientWidth);
-  inc(Result.Left);
-  inc(Result.Top);
+  InflateRect(Result, -1, 0);
+  //срезаем невидимую часть области
+  IntersectRect(Result, Result, FGridVisibleRect);
 end;
 
 procedure TvpGanttTasks.CalcGridVisibleRect;
@@ -1931,7 +1948,7 @@ begin
         было FTasksWidth + aRowBorder - FHScrollPosition  стало ClientWidth}
   // -1 потому что рисуем обводку по контуру списка задач
   aStart := FvpGantt.GetTitleHeight +
-            (FvpGantt.RowHeight + aRowBorder) * aRow - 1;
+            (FvpGantt.RowHeight + aRowBorder) * aRow - FvpGantt.FVScrollPosition - 1;
   tmpRect := Rect(0 - FHScrollPosition, aStart,
                   FGridVisibleRect.Bottom -  1, aStart + FvpGantt.RowHeight + aRowBorder);
   //обрезаем невидимые части
@@ -2039,6 +2056,7 @@ end;
 procedure TvpGanttTasks.DrawRow(aRow: integer);
 var
   rRect, fRect: TRect;
+  textPoint: TPoint;
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.DrawRow');
@@ -2061,7 +2079,7 @@ begin
       if aRow=FvpGantt.GetFocusRow then
         begin
           //если строку подсвечивать
-          fRect := CalcFocusRect(rRect);
+          fRect := CalcFocusRect;
           FvpGantt.DrawHighlightRect(Canvas, fRect);
           DrawFocusRect(aRow, fRect);
         end;
@@ -2072,9 +2090,10 @@ begin
       Canvas.LineTo(rRect.Right, rRect.Bottom);
       Canvas.LineTo(rRect.Right, rRect.Top);
       //считаем сдвиг и выводим текст
-      rRect.Top := Round(rRect.Top + (rRect.Height - Canvas.TextHeight('A'))/2);
       InflateRect(rRect, -1, -1);
-      Canvas.TextRect(rRect, rRect.Left + constCellPadding - FHScrollPosition, rRect.Top, FvpGantt.Interval[aRow].Name);
+      textPoint.X := rRect.Left + constCellPadding - FHScrollPosition;
+      textPoint.Y := rRect.Bottom - FGridTextHeight - (FvpGantt.RowHeight - FGridTextHeight) div 2;
+      Canvas.TextRect(rRect, textPoint.X, textPoint.Y, FvpGantt.Interval[aRow].Name);
     end;
 end;
 
@@ -2386,6 +2405,16 @@ begin
   Form1.Debug('TvpGantt.CalcIntervalsHeight');
   {$EndIf}
   FIntervalsHeight := IntervalCount * RowHeight;
+end;
+
+procedure TvpGantt.CalcFocusRect;
+begin
+  FFocusRect := ClientRect;
+  FFocusRect.Top := FFocusRow *
+                    (RowHeight + FGanttBorderWidth) +
+                    GetTitleHeight -
+                    FVScrollPosition;
+  FFocusRect.Height := RowHeight;
 end;
 
 function TvpGantt.GetIntervalsHeight: integer;
@@ -2821,12 +2850,13 @@ begin
   {$endif}
   if csCustomPaint in ControlState then
     Canvas.Font := Font
-  else begin
-    inherited FontChanged(Sender);
-    if FTitleFontIsDefault then begin
-      FTitleFont.Assign(Font);
-      FTitleFontIsDefault := True;
-    end;
+  else
+    begin
+      inherited FontChanged(Sender);
+      if FTitleFontIsDefault then begin
+        FTitleFont.Assign(Font);
+        FTitleFontIsDefault := True;
+      end;
   end;
 end;
 
@@ -2850,7 +2880,17 @@ begin
   //стерли старый фокус
   RepaintFocus(FFocusRow);
   FFocusRow := AValue;
+  //рассчитали новую область фокуса
+  CalcFocusRect;
   {TODO -o Vas Сделать прокрутку к месту фокусировки}
+  if FFocusRect.Bottom>ClientRect.Bottom then
+    begin
+      if FvpGanttCalendar.HandleAllocated then
+        SendMessage(FvpGanttCalendar.Handle, LM_VSCROLL, SB_THUMBPOSITION, RowHeight);
+      Form1.Memo1.Lines.Add(IntToStr(FFocusRow) + ' ' +
+                            IntToStr(FFocusRow*RowHeight + GetTitleHeight - FVScrollPosition) + ' ' +
+                            IntToStr(ClientRect.Bottom));
+    end;
   //нарисовали новый
   RepaintFocus(FFocusRow);
 end;
@@ -2884,7 +2924,7 @@ begin
   {TODO Сделать обработку вычисления положения курсора на заголовке}
   aTH := GetTitleHeight;
   if YPos > aTH then
-    Result := Trunc((YPos - GetTitleHeight) / (RowHeight + GetBorderWidth))
+    Result := Trunc((YPos + FVScrollPosition - GetTitleHeight ) / (RowHeight + GetBorderWidth))
   else
     Result := -1;
 end;
@@ -2957,6 +2997,8 @@ begin
       RightToLeft := false;
       EndEllipsis := true;
     end;
+
+  FVScrollPosition := 0;
 
   FFocusRow := -1;
   FFocusColor := clBlack;
