@@ -114,7 +114,7 @@ begin
   for i:=0 to 25 do
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
-      GInterval.Name := '123456789abcdefghijklmnopqrstuvwxyz  ' + IntToStr(i) ;
+      GInterval.Name := IntToStr(i) + '  123456789abcdefghijklmnopqrstuvwxyz' ;
       GInterval.StartDate := Now + i/60/60*i + 1;
       GInterval.DueDate := Now + i/60/60*i + 2;
       //GInterval.Visible := True;

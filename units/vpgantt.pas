@@ -242,6 +242,7 @@ type
       function  ScrollBarIsVisible(Which:Integer): Boolean;
       procedure ScrollBarPage(Which: Integer; aPage: Integer);
       procedure ScrollBarShow(Which: Integer; aValue: boolean);
+      procedure ScrollToFocus;
       procedure UpdateHorzScrollBar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure UpdateVertScrollbar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure UpdateIntervalDates(AStartDate, AEndDate: TDate);
@@ -895,6 +896,41 @@ begin
     if Which in [SB_BOTH, SB_VERT] then FVSbVisible := AValue else
     if Which in [SB_BOTH, SB_HORZ] then FHSbVisible := AValue;
   end;
+end;
+
+procedure TvpGanttCalendar.ScrollToFocus;
+var
+  curPos: integer;
+begin
+  {$ifdef DBGGANTTTASKS}
+  Form1.Debug('TvpGanttCalendar.ScrollToFocusRect');
+  {$EndIf}
+  curPos := GetScrollPos(Handle, SB_VERT);
+  //если нижняя граница области рисования фокуса ниже низа клиентской области
+  //то устанавливаем скролл ниже на позицию: текущая позиция + разница между нижними
+  //границами фокуса и клиентской области, пока еще с учетом ширины границы бордюра
+  if FvpGantt.FFocusRect.Bottom>ClientRect.Bottom then
+    curPos := curPos +
+              (FvpGantt.FFocusRect.Bottom +
+               FvpGantt.GetBorderWidth -
+               ClientRect.Bottom)
+  //иначе если верхняя граница области выделения выше видимой области сетка,
+  //то вычисляем значение скролла как:
+  //текущая граница - верхняя граница сетки минус бордюром минус верхняя граница фокуса
+  else if FvpGantt.FFocusRect.Top<FGridVisibleRect.Top then
+    curPos := curPos -
+              (FGridVisibleRect.Top -
+               FvpGantt.GetBorderWidth -
+               FvpGantt.FFocusRect.Top);
+  //не должно быть отрицательным
+  curPos := Max(0, curPos);
+  //шлем сообщение о прокрутке на нужную величину
+  SendMessage(Handle, LM_VSCROLL, MakeWParam(SB_THUMBPOSITION, curPos), 0);
+
+  {$ifdef DBGGANTTTASKS}
+  Form1.El.Debug('FFocusRow %d  curPos %d  FFocusRect.Bottom %d ClientRect.Bottom %d FFocusRect.Top %d ClientRect.Top - FvpGantt.GetTitleHeight %d',
+                 [FvpGantt.FFocusRow, curPos, FvpGantt.FFocusRect.Bottom, ClientRect.Bottom, FvpGantt.FFocusRect.Top, ClientRect.Top - FvpGantt.GetTitleHeight]);
+  {$EndIf}
 end;
 
 function TvpGanttCalendar.CalcRowRect(const aRow: integer): TRect;
@@ -2395,6 +2431,9 @@ end;
 
 procedure TvpGantt.ClearDates;
 begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.ClearDates');
+  {$EndIf}
   FStartDate := 0;
   FEndDate := 0;
 end;
@@ -2409,12 +2448,22 @@ end;
 
 procedure TvpGantt.CalcFocusRect;
 begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.CalcFocusRect');
+  {$endif}
+  {$ifdef DBGGANTTTASKS}
+  Form1.EL.Debug('FFocusRow %d RowHeight %d FGanttBorderWidth %d GetTitleHeight %d FVScrollPosition %d',
+                  [FFocusRow, RowHeight, FGanttBorderWidth, GetTitleHeight, FVScrollPosition]);
+  {$EndIf}
   FFocusRect := ClientRect;
   FFocusRect.Top := FFocusRow *
                     (RowHeight + FGanttBorderWidth) +
                     GetTitleHeight -
                     FVScrollPosition;
   FFocusRect.Height := RowHeight;
+  {$ifdef DBGGANTTTASKS}
+  Form1.EL.Debug('FFocusRect LTRB %d %d %d %d', [FFocusRect.Left, FFocusRect.Top, FFocusRect.Right, FFocusRect.Bottom]);
+  {$EndIf}
 end;
 
 function TvpGantt.GetIntervalsHeight: integer;
@@ -2869,8 +2918,6 @@ begin
 end;
 
 procedure TvpGantt.SetFocusRow(AValue: integer);
-var
-  R: TRect;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetFocusRow');
@@ -2882,15 +2929,8 @@ begin
   FFocusRow := AValue;
   //рассчитали новую область фокуса
   CalcFocusRect;
-  {TODO -o Vas Сделать прокрутку к месту фокусировки}
-  if FFocusRect.Bottom>ClientRect.Bottom then
-    begin
-      if FvpGanttCalendar.HandleAllocated then
-        SendMessage(FvpGanttCalendar.Handle, LM_VSCROLL, SB_THUMBPOSITION, RowHeight);
-      Form1.Memo1.Lines.Add(IntToStr(FFocusRow) + ' ' +
-                            IntToStr(FFocusRow*RowHeight + GetTitleHeight - FVScrollPosition) + ' ' +
-                            IntToStr(ClientRect.Bottom));
-    end;
+  if (FUpdateCount=0) AND (FvpGanttCalendar.HandleAllocated) then
+    FvpGanttCalendar.ScrollToFocus;
   //нарисовали новый
   RepaintFocus(FFocusRow);
 end;
@@ -2902,10 +2942,10 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SelectNextRow');
   {$endif}
-  if FFocusRow>=IntervalCount-1 then
+  if FFocusRow>=IntervalCount then
     Exit;
   aRow := FFocusRow + ADelta;
-  if (aRow>=0) AND (aRow<IntervalCount-1) then
+  if (aRow>=0) AND (aRow<IntervalCount) then
     begin
       aRow := FFocusRow + ADelta;
       SetFocusRow(aRow);
@@ -3146,6 +3186,7 @@ begin
     Result := -1;
   Result := FMajorScaleHeight + FMinorScaleHeight;
 end;
+
 
 procedure TvpGantt.DrawThemedCell(ACanvas: TCanvas; aRect: TRect);
 var
