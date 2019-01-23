@@ -36,11 +36,13 @@ const
 type
   TTitleStyle = (tsLazarus, tsStandard, tsNative);
 
-  TvpgOption = (vpgDrawFocusSelected,  //рисовать всегда выделение
-                vpgFocusHighlight,     //подсвечивать фокус, а не только рамку рисовать
-                vpgMajorVertGrids,     //рисовать вертикальные линии мажорной шкалы
-                vpgMinorVertGrids,     //рисовать вертикальные линии минорной шкалы
-                vpgRowHighlight);      //рисовать подсветку всей строки
+  TvpgOption = (vpgDrawFocusSelected,         //рисовать всегда выделение
+                vpgFocusHighlight,            //подсвечивать фокус, а не только рамку рисовать
+                vpgMajorVertGrids,            //рисовать вертикальные линии мажорной шкалы
+                vpgMinorVertGrids,            //рисовать вертикальные линии минорной шкалы
+                vpgRowHighlight,              //рисовать подсветку всей строки
+                vpgMoveFocusToNewInterval     //перемещать фокус на добавленную строку
+                );
 
   TvpGanttOptions = set of TvpgOption;
 
@@ -82,6 +84,7 @@ resourcestring
   RS_E_MAJORSCALE_EQUAL = 'MajorScale should by different from MinorScale';
   RS_E_MINORSCALE_HIGH = 'MinorScale should by lower than MajorScale';
   RS_E_MINORSCALE_EQUAL = 'MinorScale should by different from MajorScale';
+  RS_E_LIST_INDEX_OUT_OF_BOUNDS = 'List index out of bounds';
   //date
   RS_HOUR = 'ч.';
   RS_WEEK = 'Нед. ';
@@ -172,6 +175,7 @@ type
       procedure GetSBVisibility(out HsbVisible: boolean);
       procedure GetSBRanges(const HsbVisible: boolean;
                     out HsbRange, HsbPage, HsbPos: Integer);
+      procedure InvalidateRow(aRow: integer);
       procedure Paint; override;
       function  ScrollBarIsVisible(Which:Integer): Boolean;
       procedure ScrollBarPosition(Which, Value: integer);
@@ -244,6 +248,7 @@ type
       procedure GetSBVisibility(out HsbVisible,VsbVisible:boolean);
       procedure GetSBRanges(const HsbVisible,VsbVisible: boolean;
                     out HsbRange,VsbRange,HsbPage,VsbPage,HsbPos,VsbPos:Integer);
+      procedure InvalidateRow(aRow: integer);
       procedure Paint; override;
       procedure ScrollBarRange(Which:Integer; aRange,aPage,aPos: Integer);
       procedure ScrollBarPosition(Which, Value: integer);
@@ -348,8 +353,12 @@ type
       procedure DrawTitleText(ACanvas: TCanvas; aRect: TRect; aText: string; aAligment: TAlignment = taLeftJustify);
       function FixScrollPosition(const ARange, APage, APos: integer): integer; deprecated;
       procedure FontChanged(Sender: TObject); override;
+      procedure InvalidateFocused(aFocusRow: integer);
+      procedure InvalidateRow(aRow: integer);
+      procedure KeyDown(var Key : Word; Shift : TShiftState); override;
+      procedure KeyUp(var Key : Word; Shift : TShiftState); override;
+      procedure KeyPress(var Key: char); override;
       procedure Paint; override;
-      procedure RepaintFocus(aFocusRow: integer);
       function  ScrollBarAutomatic(Which: TScrollStyle): boolean;
       procedure SetFocusRow(AValue: integer);
       procedure SelectNextRow(const ADelta: integer);
@@ -364,7 +373,7 @@ type
       procedure InsertInterval(AnIndex: Integer; AnInterval: TvpInterval);
       procedure DeleteInterval(AnIndex: Integer);
       procedure RemoveInterval(AnInterval: TvpInterval);
-      procedure UpdateInterval(AUpdateDate: boolean = false);
+      procedure UpdateInterval(AnIndex: Integer = -1);
 
       function GetStartIntervalDate: TDateTime;
       function GetEndIntervalDate: TDateTime;
@@ -382,6 +391,10 @@ type
       property Align;
       property BorderStyle;
       property BorderWidth;
+      //events
+      property OnKeyDown;
+      property OnKeyPress;
+      property OnKeyUp;
       //custom property
       property BorderColor: TColor read FBorderColor write SetBorderColor default clActiveBorder;
       property EndDate: TDate read FEndDate write SetEndDate;
@@ -1897,6 +1910,17 @@ begin
   {$endif}
 end;
 
+procedure TvpGanttCalendar.InvalidateRow(aRow: integer);
+var
+  R: TRect;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.InvalidateRow');
+  {$endif}
+  R := CalcRowRect(aRow);
+  InvalidateRect(Handle, @R, true);
+end;
+
 procedure TvpGanttCalendar.Paint;
 begin
   {$ifdef DBGGANTTCALENDAR}
@@ -2301,6 +2325,17 @@ begin
   {$endif}
 end;
 
+procedure TvpGanttTasks.InvalidateRow(aRow: integer);
+var
+  R: TRect;
+begin
+  {$ifdef DBGGANTTTASKS}
+  Form1.Debug('TvpGanttTasks.InvalidateRow');
+  {$endif}
+  R := CalcRowRect(aRow);
+  InvalidateRect(Handle, @R, true);
+end;
+
 procedure TvpGanttTasks.Paint;
 begin
   {$ifdef DBGGANTTTASKS}
@@ -2635,7 +2670,7 @@ begin
   if FFocusColor = AValue then Exit;
   FFocusColor := AValue;
   //DONE Сделать обновление области с фокусом
-  RepaintFocus(FFocusRow);
+  InvalidateFocused(FFocusRow);
 end;
 
 procedure TvpGantt.SetMajorScale(AValue: TvpTimeScale);
@@ -2861,23 +2896,132 @@ begin
   VisualChange;
 end;
 
-procedure TvpGantt.RepaintFocus(aFocusRow: integer);
-var
-  R: TRect;
+procedure TvpGantt.InvalidateFocused(aFocusRow: integer);
 begin
   {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.UpdateFocus');
+  Form1.Debug('TvpGantt.InvalidateFocused');
+  {$endif}
+  if FUpdateCount=0 then
+    InvalidateRow(FFocusRow);
+end;
+
+procedure TvpGantt.InvalidateRow(aRow: integer);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.InvalidateRow');
   {$endif}
   if FvpGanttTasks.HandleAllocated then
-    begin
-      R := FvpGanttTasks.CalcRowRect(FFocusRow);
-      InvalidateRect(FvpGanttTasks.Handle, @R, true);
-    end;
+    FvpGanttTasks.InvalidateRow(aRow);
   if FvpGanttCalendar.HandleAllocated then
-    begin
-      R := FvpGanttCalendar.CalcRowRect(FFocusRow);
-      InvalidateRect(FvpGanttCalendar.Handle, @R, true);
-    end;
+    FvpGanttCalendar.InvalidateRow(aRow);
+end;
+
+procedure TvpGantt.KeyDown(var Key: Word; Shift: TShiftState);
+var
+  Sh: Boolean;
+  DeltaRow: Integer;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.KeyDown INIT');
+  {$endif}
+  inherited KeyDown(Key, Shift);
+
+  Sh := (ssShift in Shift);
+
+  case Key of
+    //VK_TAB:
+    //  if goTabs in Options then begin
+    //    if GetDeltaMoveNext(Sh, DeltaCol,DeltaRow,FTabAdvance) then begin
+    //      Sh := False;
+    //      MoveSel(True, DeltaCol, DeltaRow);
+    //      PreserveRowAutoInserted := True;
+    //      Key:=0;
+    //    end else if (goAutoAddRows in Options) and (DeltaRow = 1) then begin
+    //      //prevent selecting multiple cells when user presses Shift
+    //      Sh := False;
+    //      if (goAutoAddRowsSkipContentCheck in Options) or (not IsEmptyRow(Row)) then MoveSel(True, DeltaCol, DeltaRow);
+    //      Key := 0;
+    //      PreserveRowAutoInserted := True;
+    //    end else
+    //    if (TabAdvance=aaNone) or
+    //       ((TabAdvance=aaDown) and (Row>=GetLastVisibleRow)) or
+    //       (sh and (Col<=GetFirstVisibleColumn)) or
+    //       ((not sh) and (Col>=GetLastVisibleColumn)) then
+    //      TabCheckEditorKey
+    //    else
+    //      Key := 0;
+    //  end else
+    //    TabCheckEditorKey;
+    //VK_LEFT:
+    //  //Don't move to another cell is user is editing
+    //  if not FEditorKey then
+    //  begin
+    //    if Relaxed then
+    //      MoveSel(True, -cBidiMove[UseRightToLeftAlignment], 0)
+    //    else
+    //      MoveSel(True, 0,-1);
+    //  end;
+    //VK_RIGHT:
+    //  //Don't move to another cell is user is editing
+    //  if not FEditorKey then
+    //  begin
+    //    if Relaxed then
+    //      MoveSel(True, cBidiMove[UseRightToLeftAlignment], 0)
+    //    else
+    //      MoveSel(True, 0, 1);
+    //  end;
+    VK_UP:
+        SelectNextRow(-1);
+    VK_DOWN:
+        SelectNextRow(1);
+    VK_PRIOR:
+      begin
+        //кол-во видимых строк
+        DeltaRow := Ceil((ClientRect.Height - GetTitleHeight) / RowHeight);
+        SelectNextRow(-DeltaRow);
+      end;
+    VK_NEXT:
+      begin
+        DeltaRow := Ceil((ClientRect.Height - GetTitleHeight) / RowHeight);
+        SelectNextRow(DeltaRow);
+      end;
+    VK_HOME:
+      SelectNextRow(-FFocusRow);
+    VK_END:
+      SelectNextRow(IntervalCount-FFocusRow-1);
+    //VK_C:
+    //  if not FEditorKey and (Shift = [ssModifier]) then
+    //    doCopyToClipboard;
+    //VK_V:
+    //  if not FEditorKey and (Shift = [ssModifier]) then
+    //    doPasteFromClipboard;
+    //VK_X:
+    //  if not FEditorKey and (Shift = [ssShift]) then
+    //    doCutToClipboard;
+    //VK_DELETE:
+    //  if not FEditorKey and EditingAllowed(FCol)
+    //  and (Editor is TCustomEdit) and not (csDesigning in ComponentState)
+    //  then begin
+    //    EditorShow(False);
+    //    TCustomEdit(Editor).Text:='';
+    //    InvalidateCell(FCol,FRow,True);
+    //    EditorShow(True);
+    //    Key := 0;
+    //  end;
+  end;
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.KeyDown END');
+  {$endif}
+end;
+
+procedure TvpGantt.KeyUp(var Key: Word; Shift: TShiftState);
+begin
+  inherited KeyUp(Key, Shift);
+end;
+
+procedure TvpGantt.KeyPress(var Key: char);
+begin
+  inherited KeyPress(Key);
 end;
 
 function TvpGantt.ScrollBarAutomatic(Which: TScrollStyle): boolean;
@@ -2920,7 +3064,7 @@ begin
   Form1.Debug('TvpGantt.WMKillFocus');
   {$endif}
   FGanttFocused := false;
-  RepaintFocus(FFocusRow);
+  InvalidateFocused(FFocusRow);
 end;
 
 function TvpGantt.GetBorderWidth: integer;
@@ -3059,24 +3203,20 @@ begin
   {$endif}
   if (FFocusRow=AValue) then
     Exit;
-  //стерли старый фокус
-  RepaintFocus(FFocusRow);
-  //если список пустой или AValue = -1
-  if IntervalCount=0 then
+  //если список пустой  или AValue <0
+  if (IntervalCount=0) OR (AValue<0) then
     begin
       FFocusRow := -1;
       Exit
     end;
-  if AValue>IntervalCount then
-    FFocusRow := IntervalCount - 1
+  if AValue>IntervalCount-1 then
+    raise Exception.Create(RS_E_LIST_INDEX_OUT_OF_BOUNDS)
   else
     FFocusRow := AValue;
   //рассчитали новую область фокуса
   CalcFocusRect;
   if (FUpdateCount=0) AND (FvpGanttCalendar.HandleAllocated) then
     FvpGanttCalendar.ScrollToFocus;
-  //нарисовали новый
-  RepaintFocus(FFocusRow);
 end;
 
 procedure TvpGantt.SelectNextRow(const ADelta: integer);
@@ -3086,14 +3226,16 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SelectNextRow');
   {$endif}
-  if FFocusRow>=IntervalCount then
+  //если стоим на первой строкt или -1 и прокрутка вверх, то ничего не делаем
+  if (FFocusRow<=0) AND (ADelta<0) then
+    Exit;
+  //если стоим в конце диапазона и прокрутка вних, то тоже ничего не делаем
+  if (FFocusRow=IntervalCount-1) AND (ADelta>0) then
     Exit;
   aRow := FFocusRow + ADelta;
-  if (aRow>=0) AND (aRow<IntervalCount) then
-    begin
-      aRow := FFocusRow + ADelta;
-      SetFocusRow(aRow);
-    end;
+  aRow := Max(0, aRow);
+  aRow := Min(aRow, IntervalCount-1);
+  SetFocusRow(aRow);
 end;
 
 function TvpGantt.GetRowPosY(const YPos: integer): integer;
@@ -3224,8 +3366,9 @@ begin
   Form1.Debug('TvpGantt.AddInterval');
   {$endif}
   FIntervals.Add(AnInterval);
-  SetFocusRow(FIntervals.Count-1);
-  UpdateInterval(true);
+  if vpgMoveFocusToNewInterval in Options then
+    SetFocusRow(FIntervals.Count-1);
+  UpdateInterval(IntervalCount-1);
 end;
 
 procedure TvpGantt.InsertInterval(AnIndex: Integer; AnInterval: TvpInterval);
@@ -3234,8 +3377,9 @@ begin
   Form1.Debug('TvpGantt.InsertInterval');
   {$endif}
   FIntervals.Insert(AnIndex, AnInterval);
-  SetFocusRow(AnIndex);
-  UpdateInterval(true);
+  if vpgMoveFocusToNewInterval in Options then
+    SetFocusRow(AnIndex);
+  UpdateInterval(AnIndex);
 end;
 
 procedure TvpGantt.DeleteInterval(AnIndex: Integer);
@@ -3243,9 +3387,13 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.DeleteInterval');
   {$endif}
+  if AnIndex>IntervalCount-1 then
+    raise Exception.Create(RS_E_LIST_INDEX_OUT_OF_BOUNDS)
+  else if AnIndex=IntervalCount-1 then
+    SetFocusRow(AnIndex-1)
+  else
+    SetFocusRow(AnIndex);
   FIntervals.Delete(AnIndex);
-  if FFocusRow>AnIndex then
-    SetFocusRow(FFocusRow-1);
   UpdateInterval;
 end;
 
@@ -3257,24 +3405,19 @@ begin
   Form1.Debug('TvpGantt.RemoveInterval');
   {$endif}
   AnIndex := FIntervals.IndexOf(AnInterval);
-  FIntervals.Remove(AnInterval);
-  if FFocusRow>AnIndex then
-    SetFocusRow(FFocusRow-1);
-  UpdateInterval;
+  DeleteInterval(AnIndex);
 end;
 
-procedure TvpGantt.UpdateInterval(AUpdateDate: boolean = false);
+procedure TvpGantt.UpdateInterval(AnIndex: Integer = -1);
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.UpdateInterval');
   {$endif}
-  if IntervalCount=0 then
-    SetFocusRow(-1);
   //изменяются даты, пересчитаем только в случае если календарь создан
-  if AUpdateDate then
+  if AnIndex>=0 then
     if FvpGanttCalendar.HandleAllocated then
-      FvpGanttCalendar.UpdateIntervalDates(TvpInterval(FIntervals[FFocusRow]).FStartDate,
-                                           TvpInterval(FIntervals[FFocusRow]).FFinishDate);
+      FvpGanttCalendar.UpdateIntervalDates(TvpInterval(FIntervals[AnIndex]).FStartDate,
+                                           TvpInterval(FIntervals[AnIndex]).FFinishDate);
   VisualChange;
 end;
 
@@ -3286,7 +3429,7 @@ begin
   Inc(FUpdateCount);
 end;
 
-procedure TvpGantt.EndUpdate(aRefresh: boolean);
+procedure TvpGantt.EndUpdate(aRefresh: boolean = true);
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.EndUpdate');
