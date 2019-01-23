@@ -9,7 +9,6 @@ unit vpGantt;
      при добавлении интервалов.
 }
 
-
 //{$define DBGINTERVAL}
 //{$define DBGGANTT}
 //{$define DBGGANTTTASKS}
@@ -163,8 +162,7 @@ type
       procedure VisualChange; virtual;
       procedure UpdateSizes;
       //messages
-      procedure WMSize(var Message: TLMSize);
-        message LM_SIZE;
+      procedure WMSize(var Message: TLMSize); message LM_SIZE;
     protected
       procedure CreateParams(var Params: TCreateParams); override;
       procedure ClearCanvas;
@@ -230,8 +228,7 @@ type
       procedure UpdateSBVisibility;
       procedure UpdateSizes;
       //messages
-      procedure WMSize(var Message: TLMSize);
-        message LM_SIZE;
+      procedure WMSize(var Message: TLMSize); message LM_SIZE;
     protected
       procedure CalcScrollbarsRange;
       procedure CreateParams(var Params: TCreateParams); override;
@@ -1223,6 +1220,9 @@ begin
   if not HandleAllocated then
     exit;
 
+  if csDesigning in ComponentState then
+    exit;
+
   ScrollInfo.cbSize := SizeOf(ScrollInfo);
   ScrollInfo.fMask := SIF_PAGE or SIF_RANGE or SIF_POS;
   GetScrollInfo(Handle, SB_HORZ, ScrollInfo);
@@ -1298,6 +1298,9 @@ begin
   if not HandleAllocated then
     exit;
 
+  if csDesigning in ComponentState then
+    exit;
+
   ScrollInfo.cbSize := SizeOf(ScrollInfo);
   ScrollInfo.fMask := SIF_PAGE or SIF_RANGE or SIF_POS;
   GetScrollInfo(Handle, SB_VERT, ScrollInfo);
@@ -1371,6 +1374,7 @@ begin
   Form1.EL.Debug('x %d y %d',[message.XPos, message.YPos]);
   {$endif}
   inherited;
+
   aRow := FvpGantt.GetRowPosY(message.YPos);
   if aRow>-1 then
     FvpGantt.SetFocusRow(aRow);
@@ -2393,6 +2397,9 @@ begin
   if not HandleAllocated then
     exit;
 
+  if csDesigning in ComponentState then
+    exit;
+
   ScrollInfo.cbSize := SizeOf(ScrollInfo);
   ScrollInfo.fMask := SIF_PAGE or SIF_RANGE or SIF_POS;
   GetScrollInfo(Handle, SB_HORZ, ScrollInfo);
@@ -2467,6 +2474,7 @@ begin
   Form1.EL.Debug('x %d y %d',[message.XPos, message.YPos]);
   {$endif}
   inherited;
+
   aRow := FvpGantt.GetRowPosY(message.YPos);
   if aRow>-1 then
     FvpGantt.SetFocusRow(aRow);
@@ -3654,4 +3662,3 @@ end;
 
 
 end.
-
