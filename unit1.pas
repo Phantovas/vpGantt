@@ -110,7 +110,7 @@ begin
   GanttDiagram.MajorScale := vptsMonth;
   GanttDiagram.MinorScale := vptsDay;
   //GanttDiagram.TitleStyle := tsNative;
-  Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
+  //Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   for i:=0 to 25 do
     begin
       GInterval := TvpInterval.Create(GanttDiagram);

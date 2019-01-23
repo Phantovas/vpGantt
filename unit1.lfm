@@ -82,6 +82,7 @@ object Form1: TForm1
     Height = 248
     Top = 440
     Width = 368
+    Anchors = [akTop, akLeft, akRight, akBottom]
     Caption = 'Panel1'
     ClientHeight = 248
     ClientWidth = 368
@@ -119,7 +120,7 @@ object Form1: TForm1
     Height = 336
     Top = 336
     Width = 618
-    Anchors = [akTop, akLeft, akRight, akBottom]
+    Anchors = [akTop, akLeft, akBottom]
     BevelOuter = bvNone
     Caption = 'Panel3'
     TabOrder = 6

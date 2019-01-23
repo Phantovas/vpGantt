@@ -10,8 +10,8 @@ unit vpGantt;
 }
 
 //{$define DBGINTERVAL}
-//{$define DBGGANTT}
-//{$define DBGGANTTTASKS}
+{$define DBGGANTT}
+{$define DBGGANTTTASKS}
 //{$define DBGGANTTCALENDAR}
 //{$define DBGSCROLL}
 
@@ -332,7 +332,8 @@ type
       procedure SetTitleColor(AValue: TColor);
       procedure SetTitleFont(const AValue: TFont);
       procedure SetTitleStyle(const AValue: TTitleStyle);
-      procedure VisualChange;
+      procedure UpdateSizes;
+      procedure WMSize(var message: TLMSize); message LM_SIZE;
       procedure WMKillFocus(var message: TLMKillFocus); message LM_KILLFOCUS;
     protected
       procedure CalcIntervalsHeight;
@@ -360,6 +361,7 @@ type
       procedure SetFocusRow(AValue: integer);
       procedure SelectNextRow(const ADelta: integer);
       procedure UpdateIntervalDates(AStartDate, AEndDate: TDate);
+      procedure VisualChange;
     public
       constructor Create(AOwner: TComponent); override;
       destructor Destroy; override;
@@ -1006,7 +1008,7 @@ procedure TvpGanttCalendar.ScrollToFocus;
 var
   curPos: integer;
 begin
-  {$ifdef DBGGANTTTASKS}
+  {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.ScrollToFocusRect');
   {$EndIf}
   curPos := GetScrollPos(Handle, SB_VERT);
@@ -1031,7 +1033,7 @@ begin
   //шлем сообщение о прокрутке на нужную величину
   SendMessage(Handle, LM_VSCROLL, MakeWParam(SB_THUMBPOSITION, curPos), 0);
 
-  {$ifdef DBGGANTTTASKS}
+  {$ifdef DBGGANTTCALENDAR}
   Form1.El.Debug('FFocusRow %d  curPos %d  FFocusRect.Bottom %d ClientRect.Bottom %d FFocusRect.Top %d ClientRect.Top - FvpGantt.GetTitleHeight %d',
                  [FvpGantt.FFocusRow, curPos, FvpGantt.FFocusRect.Bottom, ClientRect.Bottom, FvpGantt.FFocusRect.Top, ClientRect.Top - FvpGantt.GetTitleHeight]);
   {$EndIf}
@@ -1042,7 +1044,7 @@ var
   aStart, aRowBorder: integer;
   tmpRect: TRect;
 begin
-  {$ifdef DBGGANTTTASKS}
+  {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.CalcRowRect');
   {$EndIf}
   aRowBorder := FvpGantt.GetBorderWidth;
@@ -1949,7 +1951,7 @@ begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.WMSize');
   {$endif}
-  if not Self.IsResizing then
+  if not IsResizing then
     begin
       UpdateSizes;
       inherited;
@@ -3006,7 +3008,7 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.VisualChange INIT');
   {$endif}
-  CalcIntervalsHeight;
+  UpdateSizes;
   if (FUpdateCount=0) AND HandleAllocated then
     begin
       {$ifdef DBGGANTT}
@@ -3016,6 +3018,29 @@ begin
         FvpGanttTasks.VisualChange;
       if FvpGanttCalendar.HandleAllocated then
         FvpGanttCalendar.VisualChange;
+    end;
+end;
+
+procedure TvpGantt.UpdateSizes;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.UpdateSizes');
+  {$endif}
+  CalcIntervalsHeight;
+  //считаем сдвиг по вертикали
+  {TODO -o Vas Надо как-то посчитать сдвиг по вертикали }
+  FVScrollPosition := FVScrollPosition - 20;
+end;
+
+procedure TvpGantt.WMSize(var message: TLMSize);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.WMSize');
+  {$endif}
+  if not IsResizing then
+    begin
+      UpdateSizes;
+      inherited;
     end;
 end;
 
@@ -3298,8 +3323,8 @@ begin
   if FvpGanttCalendar.HandleAllocated then
     FvpGanttCalendar.CalcScaleCount;
   {$ifdef DBGGANTT}
-  Form1.Debug('Start date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FvpGantt.StartDate));
-  Form1.Debug('End date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FvpGantt.EndDate));
+  Form1.Debug('Start date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', StartDate));
+  Form1.Debug('End date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', EndDate));
   Form1.Debug('Start interval date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FStartIntervalDate));
   Form1.Debug('End interval date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FEndIntervalDate));
   {$endif}
