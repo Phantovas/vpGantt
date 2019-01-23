@@ -3029,7 +3029,8 @@ begin
   CalcIntervalsHeight;
   //считаем сдвиг по вертикали
   {TODO -o Vas Надо как-то посчитать сдвиг по вертикали }
-  FVScrollPosition := FVScrollPosition - 20;
+  if FIntervalsHeight-FVScrollPosition>ClientHeight-GetTitleHeight then
+    FVScrollPosition := FVScrollPosition - 20;
 end;
 
 procedure TvpGantt.WMSize(var message: TLMSize);
