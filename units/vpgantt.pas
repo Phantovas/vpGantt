@@ -4,13 +4,17 @@ unit vpGantt;
   TODO -o Vas :
   1. Поравить отрисовку бордера в гриде, рисоват надо внутри ячейки
   2. Интервалы сделать как коллекцию. С возможностью задания для каждого интервала своих свойств
+  3. Подумать о группах.
+  4. ЕСли будут группы, то тогда можно UpdateDates делать по группам, а в группах обновлять максимальную и минимальные даты
+     при добавлении интервалов.
 }
 
 
-{$define DBGINTERVAL}
+//{$define DBGINTERVAL}
 //{$define DBGGANTT}
 //{$define DBGGANTTTASKS}
 //{$define DBGGANTTCALENDAR}
+//{$define DBGSCROLL}
 
 interface
 
@@ -1080,6 +1084,9 @@ begin
   Form1.El.Debug('FvpGantt.IntervalCount=%d FvpGantt.GetIntervalsHeight=%d', [FvpGantt.IntervalCount, FvpGantt.GetIntervalsHeight]);
   {$endif}
   FCalendarHeight := FvpGantt.GetTitleHeight + FvpGantt.GetIntervalsHeight;
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.El.Debug('FCalendarHeight %d', [FCalendarHeight]);
+  {$endif}
 end;
 
 procedure TvpGanttCalendar.CalcCalendarWidth;
@@ -1088,29 +1095,37 @@ begin
   Form1.Debug('TvpGanttCalendar.CalcCalendarWidth');
   {$endif}
   FCalendarWidth := FMinorScaleCount * FPixelePerMinorScale;
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.El.Debug('FCalendarWidth %d', [FCalendarWidth]);
+  {$endif}
 end;
 
 procedure TvpGanttCalendar.CalcGridVisibleRect;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.CalcGridVisibleRect');
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.CalcGridVisibleRect');
   {$endif}
   //рассчитываем область
   FGridVisibleRect.Left := ClientRect.Left;
   FGridVisibleRect.Top := ClientRect.Top + FvpGantt.GetTitleHeight;
-  FGridVisibleRect.Width := ClientWidth;
+  FGridVisibleRect.Width := Min(FCalendarWidth - FHScrollPosition, ClientWidth);
   FGridVisibleRect.Height := Ceil(ClientHeight / FvpGantt.RowHeight)* FvpGantt.RowHeight;
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.EL.Debug('FGridVisibleRect Left %d Top %d Right %d Bottom %d',
+                  [FGridVisibleRect.Left, FGridVisibleRect.Top, FGridVisibleRect.Right, FGridVisibleRect.Bottom]);
+  {$ENDIF}
 end;
 
 function TvpGanttCalendar.CalcFocusRect: TRect;
 begin
-  {$ifdef TvpGanttCalendar}
+  {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.CalcFocusRect');
   {$endif}
   Result := FvpGantt.FFocusRect;
-  Result.Left := Max(Result.Left, ClientRect.Left);
-  Result.Right := Min(Result.Right, ClientRect.Right);
-  InflateRect(Result, -1, 0);
+  //сдвигаем на 1 пиксель (ширина обводки)
+  Inc(Result.Left);
+  //удлиняем на ширину календаря
+  Result.Width := FCalendarWidth;
   //срезаем невидимую часть области
   IntersectRect(Result, Result, FGridVisibleRect);
 end;
@@ -1167,6 +1182,19 @@ begin
   FGridTextHeight := Canvas.GetTextHeight('A');
   CalcCalendarHeight;
   CalcCalendarWidth;
+  //сдвигаем правый край, только если сетка нарсиована не с первого диапазона
+  //и ширина сетки - скролл горизонтальный < клиентской области
+  //текущую позицию сдвига уменьшаем на разницу между шириной клиентской области и видимой области сетки
+  if (FHScrollPosition>0) AND (FCalendarWidth-FHScrollPosition<ClientWidth) then
+    begin
+      FHScrollPosition := Max(0, FHScrollPosition - (ClientWidth - FGridVisibleRect.Width));
+      {$ifdef DBGSCROLL}
+      Form1.Debug('FCalendarWidth-FHScrollPosition<ClientWidth');
+      Form1.EL.Debug('FHScrollPosition %d FCalendarWidth %d ClientWidth %d - FGridVisibleRect.Right %d ClientRect.Right %d',
+                      [FHScrollPosition, FCalendarWidth, ClientWidth, FGridVisibleRect.Right, ClientRect.Right]);
+      {$endif}
+    end;
+  //пересчитываем видимую область
   CalcScrollbarsRange;
   CalcGridVisibleRect;
 end;
@@ -1683,7 +1711,10 @@ begin
   aMajorScaleWidth := GetMajorScaleWidth;
   aMinorScaleWidth := GetMinorScaleWidth;
   {$ifdef DBGGANTTCALENDAR}
-  Form1.EL.Debug('rRect.Top %d  rRect.Height %d', [rRect.top, rRect.Height]);
+  Form1.EL.Debug('rRect.Left %d rRect.Top %d rRect.Right %d rRect.Bottom %d',
+                  [rRect.Left, rRect.Top, rRect.Right, rRect.Bottom]);
+  Form1.EL.Debug('FHScrollPosition %d, ClientWidth %d, FGridVisibleRect.Width %d, FCalendarWidth %d',
+                  [FHScrollPosition, ClientWidth, FGridVisibleRect.Width, FCalendarWidth]);
   {$endif}
   if rRect.Height>0 then
     begin
@@ -1872,14 +1903,24 @@ begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.UpdateSizes');
   {$endif}
-  if HandleAllocated then
+  FGridTextHeight := Canvas.GetTextHeight('A');
+  CalcTasksHeight;
+  CalcTasksWidth;
+  //сдвигаем правый край, только если сетка нарсиована не с первого диапазона
+  //и ширина сетки - скролл горизонтальный < клиентской области
+  //текущую позицию сдвига уменьшаем на разницу между шириной клиентской области и видимой области сетки
+  if (FHScrollPosition>0) AND (FTasksWidth-FHScrollPosition<ClientWidth) then
     begin
-      FGridTextHeight := Canvas.GetTextHeight('A');
-      CalcTasksHeight;
-      CalcTasksWidth;
-      CalcScrollbarsRange;
-      CalcGridVisibleRect;
+      FHScrollPosition := Max(0, FHScrollPosition - (ClientWidth - FGridVisibleRect.Width));
+      {$ifdef DBGSCROLL}
+      Form1.Debug('FCalendarWidth-FHScrollPosition<ClientWidth');
+      Form1.EL.Debug('FHScrollPosition %d FTasksWidth %d ClientWidth %d - FGridVisibleRect.Right %d ClientRect.Right %d',
+                      [FHScrollPosition, FTasksWidth, ClientWidth, FGridVisibleRect.Right, ClientRect.Right]);
+      {$endif}
     end;
+  //пересчитываем видимую область
+  CalcScrollbarsRange;
+  CalcGridVisibleRect;
 end;
 
 procedure TvpGanttTasks.VisualChange;
@@ -3265,12 +3306,14 @@ begin
   {$endif}
   {DONE Отработать правильное нажатие на титле, иначе ниже середины получаем 0 строку и соответственно
         переход на первую строку}
-  {TODO Сделать обработку вычисления положения курсора на заголовке}
   aTH := GetTitleHeight;
   if YPos > aTH then
     Result := Trunc((YPos + FVScrollPosition - GetTitleHeight ) / (RowHeight + GetBorderWidth))
   else
     Result := -1;
+  {TODO Сделать обработку вычисления положения курсора на заголовке}
+  //if thisTitle then
+  //  DoTitleClick;
 end;
 
 
