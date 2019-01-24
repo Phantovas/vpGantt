@@ -24,6 +24,7 @@ type
     Panel1: TPanel;
     Panel2: TPanel;
     Panel3: TPanel;
+    Panel4: TPanel;
     Splitter1: TSplitter;
     StringGrid1: TStringGrid;
     procedure Button1Click(Sender: TObject);
@@ -55,18 +56,18 @@ implementation
 procedure TForm1.Button1Click(Sender: TObject);
 begin
   Debug('TForm1.Button1Click');
-  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', GanttDiagram.StartDate));
-  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', GanttDiagram.StartDate));
-  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', GanttDiagram.EndDate));
-  Memo1.Lines.Add(Format('%d', [DateTimeToTimeStamp(GanttDiagram.StartDate).DAte]));
-  Memo1.Lines.Add(Format('%d', [DateTimeToTimeStamp(GanttDiagram.EndDate).Date]));
-  Memo1.Lines.Add(Format('%f', [UnitsBetweenDatesEx(GanttDiagram.StartDate, GanttDiagram.EndDate, vptsMinute)]));
-  Memo1.Lines.Add(Format('%f', [MinuteSpan(GanttDiagram.StartDate, GanttDiagram.EndDate)]));
-  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', StartOfADay(2019, 1, 1)));
-  Memo1.Lines.Add(FormatDateTime('dd.mm.yyyy hh:nn:ss', EndOfAYear(2019)));
-  Memo1.Lines.Add(Format('%f', [YearSpan(StartOfADay(2019, 1, 1), EndOfAYear(2019))]));
-  Memo1.Lines.Add(Format('%d', [WeekOfTheYear(GanttDiagram.StartDate)]));
-  Memo1.Lines.Add(Format('%d', [WeekOfTheYear(GanttDiagram.EndDate)]));
+
+  Panel4.Canvas.Pen.Color := clREd;
+  Panel4.Canvas.Rectangle(0,0, 10,10);
+  Panel4.Canvas.Rectangle(10,10, Panel4.ClientWidth, Panel4.ClientHeight);
+  Memo1.Lines.Add('Panel4.ClientWidth ' + IntToStr(Panel4.ClientWidth));
+  Memo1.Lines.Add('Panel4.ClientREct.Left ' + IntToStr(Panel4.ClientREct.LEft));
+  Memo1.Lines.Add('Panel4.ClientREct.Right ' + IntToStr(Panel4.ClientREct.Right));
+  Memo1.Lines.Add('Panel4.ClientHeight ' + IntToStr(Panel4.ClientHeight));
+  Memo1.Lines.Add('Panel4.ClientREct.Top ' + IntToStr(Panel4.ClientREct.Top));
+  Memo1.Lines.Add('Panel4.ClientREct.Bottom ' + IntToStr(Panel4.ClientREct.Bottom));
+  Memo1.Lines.Add('Panel4.ClientREct.Width ' + IntToStr(Panel4.ClientREct.Width));
+  Memo1.Lines.Add('Panel4.ClientREct.HEight ' + IntToStr(Panel4.ClientREct.Height));
 
 end;
 
@@ -109,7 +110,7 @@ begin
   GanttDiagram.TaskTitleCaption := 'Проекты';
   GanttDiagram.MajorScale := vptsMonth;
   GanttDiagram.MinorScale := vptsDay;
-  //GanttDiagram.TitleStyle := tsNative;
+  GanttDiagram.TitleStyle := tsStandard;
   //Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   for i:=0 to 25 do
     begin

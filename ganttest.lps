@@ -4,7 +4,7 @@
     <PathDelim Value="\"/>
     <Version Value="10"/>
     <BuildModes Active="Default"/>
-    <Units Count="69">
+    <Units Count="67">
       <Unit0>
         <Filename Value="ganttest.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -19,11 +19,10 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="Unit1"/>
-        <TopLine Value="98"/>
-        <CursorPos X="3" Y="113"/>
+        <TopLine Value="97"/>
+        <CursorPos X="4" Y="113"/>
         <UsageCount Value="200"/>
         <Loaded Value="True"/>
-        <LoadedDesigner Value="True"/>
       </Unit1>
       <Unit2>
         <Filename Value="units\vpganttinterval.pas"/>
@@ -32,21 +31,22 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="24"/>
         <CursorPos X="29" Y="6"/>
-        <UsageCount Value="186"/>
+        <UsageCount Value="200"/>
       </Unit2>
       <Unit3>
         <Filename Value="units\vpgantt.pas"/>
         <UnitName Value="vpGantt"/>
         <IsVisibleTab Value="True"/>
         <EditorIndex Value="1"/>
-        <TopLine Value="3033"/>
-        <CursorPos Y="3040"/>
+        <TopLine Value="2534"/>
+        <CursorPos X="21" Y="2544"/>
         <ExtraEditorCount Value="1"/>
         <ExtraEditor1>
+          <IsVisibleTab Value="True"/>
           <EditorIndex Value="-1"/>
-          <WindowIndex Value="-1"/>
-          <TopLine Value="1622"/>
-          <CursorPos X="27" Y="1642"/>
+          <WindowIndex Value="1"/>
+          <TopLine Value="2173"/>
+          <CursorPos X="34" Y="2199"/>
         </ExtraEditor1>
         <UsageCount Value="100"/>
         <Loaded Value="True"/>
@@ -57,14 +57,14 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="2036"/>
         <CursorPos X="15" Y="2054"/>
-        <UsageCount Value="13"/>
+        <UsageCount Value="12"/>
       </Unit4>
       <Unit5>
         <Filename Value="C:\lazarus\lcl\include\wincontrol.inc"/>
         <EditorIndex Value="2"/>
-        <TopLine Value="5367"/>
-        <CursorPos Y="5384"/>
-        <UsageCount Value="16"/>
+        <TopLine Value="7443"/>
+        <CursorPos X="14" Y="7461"/>
+        <UsageCount Value="23"/>
         <Loaded Value="True"/>
       </Unit5>
       <Unit6>
@@ -73,14 +73,14 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="328"/>
         <CursorPos Y="330"/>
-        <UsageCount Value="3"/>
+        <UsageCount Value="2"/>
       </Unit6>
       <Unit7>
         <Filename Value="C:\Lazarus\components\rx\rxdb\rxdbgrid.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="698"/>
         <CursorPos X="3" Y="715"/>
-        <UsageCount Value="9"/>
+        <UsageCount Value="8"/>
       </Unit7>
       <Unit8>
         <Filename Value="C:\Lazarus\lcl\dbgrids.pas"/>
@@ -88,14 +88,14 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="268"/>
         <CursorPos X="3" Y="283"/>
-        <UsageCount Value="9"/>
+        <UsageCount Value="8"/>
       </Unit8>
       <Unit9>
         <Filename Value="C:\lazarus\lcl\grids.pas"/>
         <UnitName Value="Grids"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="4684"/>
-        <CursorPos Y="4694"/>
+        <TopLine Value="4843"/>
+        <CursorPos X="3" Y="4846"/>
         <UsageCount Value="35"/>
       </Unit9>
       <Unit10>
@@ -104,21 +104,21 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="549"/>
         <CursorPos Y="567"/>
-        <UsageCount Value="6"/>
+        <UsageCount Value="5"/>
       </Unit10>
       <Unit11>
         <Filename Value="units\gsGanttCalendar.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="2077"/>
         <CursorPos X="23" Y="2081"/>
-        <UsageCount Value="53"/>
+        <UsageCount Value="52"/>
       </Unit11>
       <Unit12>
         <Filename Value="units\utask.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="29"/>
         <CursorPos Y="34"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="4"/>
       </Unit12>
       <Unit13>
         <Filename Value="units\ubasedbclasses.pas"/>
@@ -126,13 +126,13 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="8"/>
         <CursorPos X="11" Y="25"/>
-        <UsageCount Value="3"/>
+        <UsageCount Value="2"/>
       </Unit13>
       <Unit14>
         <Filename Value="..\promet-base-master\base_pm\gsGanttCalendar.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="52"/>
-        <UsageCount Value="3"/>
+        <UsageCount Value="2"/>
       </Unit14>
       <Unit15>
         <Filename Value="C:\lazarus\components\lazutils\lazutf8.pas"/>
@@ -140,178 +140,171 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="3267"/>
         <CursorPos Y="3295"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="4"/>
       </Unit15>
       <Unit16>
         <Filename Value="C:\lazarus\lcl\include\canvas.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1577"/>
         <CursorPos Y="1598"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="4"/>
       </Unit16>
       <Unit17>
         <Filename Value="units\xTblCal.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="15"/>
         <CursorPos X="24" Y="47"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="4"/>
       </Unit17>
       <Unit18>
         <Filename Value="units\ExList.pas"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="4"/>
       </Unit18>
       <Unit19>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\objpas\classes\classesh.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="11"/>
         <CursorPos X="4" Y="28"/>
-        <UsageCount Value="2"/>
+        <UsageCount Value="1"/>
       </Unit19>
       <Unit20>
-        <Filename Value="C:\Lazarus\fpc\3.0.2\source\rtl\objpas\classes\lists.inc"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="791"/>
-        <CursorPos X="3" Y="793"/>
-        <UsageCount Value="1"/>
-      </Unit20>
-      <Unit21>
         <Filename Value="units\gsGanttCalendar_my.pas"/>
         <UnitName Value="gsGanttCalendar"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1195"/>
         <CursorPos X="20" Y="1188"/>
-        <UsageCount Value="6"/>
-      </Unit21>
-      <Unit22>
+        <UsageCount Value="5"/>
+      </Unit20>
+      <Unit21>
         <Filename Value="C:\lazarus\lcl\spin.pp"/>
         <UnitName Value="Spin"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="49" Y="24"/>
-        <UsageCount Value="5"/>
-      </Unit22>
-      <Unit23>
+        <UsageCount Value="4"/>
+      </Unit21>
+      <Unit22>
         <Filename Value="C:\lazarus\lcl\editbtn.pas"/>
         <UnitName Value="EditBtn"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="745"/>
         <CursorPos X="3" Y="763"/>
-        <UsageCount Value="5"/>
-      </Unit23>
-      <Unit24>
+        <UsageCount Value="4"/>
+      </Unit22>
+      <Unit23>
         <Filename Value="C:\lazarus\components\datetimectrls\datetimepicker.pas"/>
         <UnitName Value="DateTimePicker"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="391"/>
         <CursorPos X="3" Y="409"/>
-        <UsageCount Value="5"/>
-      </Unit24>
-      <Unit25>
+        <UsageCount Value="4"/>
+      </Unit23>
+      <Unit24>
         <Filename Value="C:\lazarus\lcl\graphics.pp"/>
         <UnitName Value="Graphics"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="720"/>
         <CursorPos X="14" Y="738"/>
-        <UsageCount Value="10"/>
-      </Unit25>
-      <Unit26>
+        <UsageCount Value="9"/>
+      </Unit24>
+      <Unit25>
         <Filename Value="C:\lazarus\lcl\include\control.inc"/>
         <EditorIndex Value="3"/>
         <TopLine Value="2108"/>
         <CursorPos Y="2125"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="17"/>
         <Loaded Value="True"/>
-      </Unit26>
-      <Unit27>
+      </Unit25>
+      <Unit26>
         <Filename Value="C:\lazarus\lcl\dynamicarray.pas"/>
         <UnitName Value="DynamicArray"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="76"/>
         <CursorPos Y="97"/>
-        <UsageCount Value="5"/>
-      </Unit27>
-      <Unit28>
+        <UsageCount Value="4"/>
+      </Unit26>
+      <Unit27>
         <Filename Value="C:\Lazarus\lcl\lclclasses.pp"/>
         <UnitName Value="LCLClasses"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="40"/>
         <CursorPos X="14" Y="57"/>
-        <UsageCount Value="9"/>
-      </Unit28>
-      <Unit29>
+        <UsageCount Value="8"/>
+      </Unit27>
+      <Unit28>
         <Filename Value="C:\lazarus\lcl\lresources.pp"/>
         <UnitName Value="LResources"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="783"/>
         <CursorPos Y="801"/>
-        <UsageCount Value="5"/>
-      </Unit29>
-      <Unit30>
+        <UsageCount Value="4"/>
+      </Unit28>
+      <Unit29>
         <Filename Value="C:\Lazarus\lcl\include\customform.inc"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="7"/>
-      </Unit30>
-      <Unit31>
+        <UsageCount Value="6"/>
+      </Unit29>
+      <Unit30>
         <Filename Value="C:\lazarus\lcl\include\application.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="2186"/>
         <CursorPos Y="2203"/>
-        <UsageCount Value="5"/>
-      </Unit31>
-      <Unit32>
+        <UsageCount Value="4"/>
+      </Unit30>
+      <Unit31>
         <Filename Value="units\xSpin.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="57"/>
         <CursorPos X="45" Y="75"/>
-        <UsageCount Value="5"/>
-      </Unit32>
-      <Unit33>
+        <UsageCount Value="4"/>
+      </Unit31>
+      <Unit32>
         <Filename Value="C:\lazarus\lcl\lmessages.pp"/>
         <UnitName Value="LMessages"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="172"/>
         <CursorPos X="54" Y="191"/>
-        <UsageCount Value="9"/>
-      </Unit33>
-      <Unit34>
+        <UsageCount Value="8"/>
+      </Unit32>
+      <Unit33>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\win\wininc\messages.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1064"/>
         <CursorPos X="6" Y="1082"/>
-        <UsageCount Value="5"/>
-      </Unit34>
-      <Unit35>
+        <UsageCount Value="4"/>
+      </Unit33>
+      <Unit34>
         <Filename Value="C:\lazarus\components\tvplanit\source\vpdbds.pas"/>
         <UnitName Value="VpDBDS"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="2195"/>
         <CursorPos Y="2225"/>
-        <UsageCount Value="5"/>
-      </Unit35>
-      <Unit36>
+        <UsageCount Value="4"/>
+      </Unit34>
+      <Unit35>
         <Filename Value="units\utasks.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="197"/>
         <CursorPos X="84" Y="225"/>
-        <UsageCount Value="5"/>
-      </Unit36>
-      <Unit37>
+        <UsageCount Value="4"/>
+      </Unit35>
+      <Unit36>
         <Filename Value="C:\Lazarus\lcl\stdctrls.pp"/>
         <UnitName Value="StdCtrls"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="502"/>
         <CursorPos X="15" Y="519"/>
-        <UsageCount Value="3"/>
-      </Unit37>
-      <Unit38>
+        <UsageCount Value="2"/>
+      </Unit36>
+      <Unit37>
         <Filename Value="C:\lazarus\lcl\forms.pp"/>
         <UnitName Value="Forms"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="58"/>
         <CursorPos X="35" Y="76"/>
-        <UsageCount Value="5"/>
-      </Unit38>
-      <Unit39>
+        <UsageCount Value="4"/>
+      </Unit37>
+      <Unit38>
         <Filename Value="..\promet-base-master\base_pm\uganttview.pas"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
@@ -319,335 +312,328 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="451"/>
         <CursorPos X="113" Y="16"/>
-        <UsageCount Value="5"/>
-      </Unit39>
-      <Unit40>
+        <UsageCount Value="4"/>
+      </Unit38>
+      <Unit39>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\packages\rtl-objpas\src\inc\dateutils.pp"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="5"/>
-      </Unit40>
-      <Unit41>
+        <UsageCount Value="4"/>
+      </Unit39>
+      <Unit40>
         <Filename Value="C:\lazarus\lcl\calendar.pp"/>
         <UnitName Value="Calendar"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="5"/>
-      </Unit41>
-      <Unit42>
+        <UsageCount Value="4"/>
+      </Unit40>
+      <Unit41>
         <Filename Value="C:\lazarus\lcl\include\customcontrol.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="70"/>
         <CursorPos X="3" Y="78"/>
-        <UsageCount Value="10"/>
-      </Unit42>
-      <Unit43>
+        <UsageCount Value="9"/>
+      </Unit41>
+      <Unit42>
         <Filename Value="C:\lazarus\lcl\extctrls.pp"/>
         <UnitName Value="ExtCtrls"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1000"/>
         <CursorPos X="3" Y="1000"/>
-        <UsageCount Value="9"/>
-      </Unit43>
-      <Unit44>
+        <UsageCount Value="8"/>
+      </Unit42>
+      <Unit43>
         <Filename Value="C:\lazarus\lcl\include\winapih.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="314"/>
         <CursorPos X="10" Y="332"/>
-        <UsageCount Value="9"/>
-      </Unit44>
-      <Unit45>
+        <UsageCount Value="8"/>
+      </Unit43>
+      <Unit44>
         <Filename Value="C:\lazarus\lcl\lcltype.pp"/>
         <UnitName Value="LCLType"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="382"/>
         <CursorPos X="3" Y="399"/>
-        <UsageCount Value="17"/>
-      </Unit45>
-      <Unit46>
+        <UsageCount Value="16"/>
+      </Unit44>
+      <Unit45>
         <Filename Value="C:\lazarus\lcl\lclproc.pas"/>
         <UnitName Value="LCLProc"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="1439"/>
-        <CursorPos X="42" Y="1457"/>
-        <UsageCount Value="3"/>
-      </Unit46>
-      <Unit47>
+        <TopLine Value="252"/>
+        <CursorPos X="10" Y="270"/>
+        <UsageCount Value="9"/>
+      </Unit45>
+      <Unit46>
         <Filename Value="C:\lazarus\components\lazutils\lazlogger.pas"/>
         <UnitName Value="LazLogger"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="111"/>
         <CursorPos X="39" Y="138"/>
-        <UsageCount Value="2"/>
-      </Unit47>
-      <Unit48>
+        <UsageCount Value="1"/>
+      </Unit46>
+      <Unit47>
         <Filename Value="C:\lazarus\components\lazutils\lazloggerbase.pas"/>
         <UnitName Value="LazLoggerBase"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="722"/>
         <CursorPos X="3" Y="725"/>
-        <UsageCount Value="2"/>
-      </Unit48>
-      <Unit49>
+        <UsageCount Value="1"/>
+      </Unit47>
+      <Unit48>
         <Filename Value="C:\lazarus\components\lazutils\LazLoggerIntf.inc"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="8"/>
-      </Unit49>
-      <Unit50>
+        <UsageCount Value="7"/>
+      </Unit48>
+      <Unit49>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\inc\systemh.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="425"/>
         <CursorPos X="3" Y="443"/>
-        <UsageCount Value="3"/>
-      </Unit50>
-      <Unit51>
+        <UsageCount Value="2"/>
+      </Unit49>
+      <Unit50>
         <Filename Value="C:\lazarus\lcl\include\intfbasewinapi.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1968"/>
         <CursorPos X="3" Y="1970"/>
-        <UsageCount Value="2"/>
-      </Unit51>
-      <Unit52>
+        <UsageCount Value="1"/>
+      </Unit50>
+      <Unit51>
         <Filename Value="C:\lazarus\lcl\include\lclintfh.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="65"/>
         <CursorPos X="10" Y="83"/>
-        <UsageCount Value="9"/>
-      </Unit52>
-      <Unit53>
+        <UsageCount Value="8"/>
+      </Unit51>
+      <Unit52>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\packages\fcl-image\src\fpcanvas.pp"/>
         <UnitName Value="FPCanvas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="157"/>
         <CursorPos X="14" Y="174"/>
-        <UsageCount Value="8"/>
-      </Unit53>
-      <Unit54>
+        <UsageCount Value="7"/>
+      </Unit52>
+      <Unit53>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\inc\typshrdh.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="129"/>
         <CursorPos X="3" Y="101"/>
-        <UsageCount Value="2"/>
-      </Unit54>
-      <Unit55>
+        <UsageCount Value="1"/>
+      </Unit53>
+      <Unit54>
         <Filename Value="C:\lazarus\lcl\themes.pas"/>
         <UnitName Value="Themes"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="126"/>
         <CursorPos X="5" Y="143"/>
-        <UsageCount Value="5"/>
-      </Unit55>
-      <Unit56>
+        <UsageCount Value="4"/>
+      </Unit54>
+      <Unit55>
         <Filename Value="C:\Lazarus\fpc\3.0.2\source\packages\fcl-base\src\eventlog.pp"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="135"/>
         <CursorPos X="4" Y="137"/>
-        <UsageCount Value="9"/>
-      </Unit56>
-      <Unit57>
-        <Filename Value="C:\Lazarus\lcl\include\customlistbox.inc"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="313"/>
-        <CursorPos X="3" Y="315"/>
-        <UsageCount Value="1"/>
-      </Unit57>
-      <Unit58>
+        <UsageCount Value="8"/>
+      </Unit55>
+      <Unit56>
         <Filename Value="C:\Lazarus\lcl\widgetset\wsstdctrls.pp"/>
         <UnitName Value="WSStdCtrls"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="95"/>
         <CursorPos X="20" Y="112"/>
-        <UsageCount Value="9"/>
-      </Unit58>
-      <Unit59>
+        <UsageCount Value="8"/>
+      </Unit56>
+      <Unit57>
         <Filename Value="C:\Lazarus\lcl\include\customlabel.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="121"/>
         <CursorPos X="3" Y="123"/>
-        <UsageCount Value="10"/>
-      </Unit59>
-      <Unit60>
+        <UsageCount Value="9"/>
+      </Unit57>
+      <Unit58>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\packages\rtl-objpas\src\inc\dateutil.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1254"/>
         <CursorPos X="10" Y="1272"/>
-        <UsageCount Value="4"/>
-      </Unit60>
-      <Unit61>
+        <UsageCount Value="3"/>
+      </Unit58>
+      <Unit59>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\objpas\sysutils\datih.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="13"/>
         <CursorPos X="4" Y="31"/>
-        <UsageCount Value="5"/>
-      </Unit61>
-      <Unit62>
+        <UsageCount Value="4"/>
+      </Unit59>
+      <Unit60>
         <Filename Value="C:\Lazarus\fpc\3.0.2\source\rtl\objpas\types.pp"/>
         <UnitName Value="Types"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="306"/>
         <CursorPos X="10" Y="323"/>
-        <UsageCount Value="7"/>
-      </Unit62>
-      <Unit63>
+        <UsageCount Value="6"/>
+      </Unit60>
+      <Unit61>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\objpas\sysutils\sysinth.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="89"/>
         <CursorPos X="13" Y="106"/>
-        <UsageCount Value="2"/>
-      </Unit63>
-      <Unit64>
+        <UsageCount Value="1"/>
+      </Unit61>
+      <Unit62>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\objpas\sysutils\dati.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="256"/>
         <CursorPos X="3" Y="260"/>
-        <UsageCount Value="2"/>
-      </Unit64>
-      <Unit65>
+        <UsageCount Value="1"/>
+      </Unit62>
+      <Unit63>
         <Filename Value="C:\Lazarus\lcl\graphutil.pp"/>
         <UnitName Value="GraphUtil"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="8"/>
-      </Unit65>
-      <Unit66>
+        <UsageCount Value="7"/>
+      </Unit63>
+      <Unit64>
         <Filename Value="C:\Lazarus\lcl\include\brush.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="20"/>
         <CursorPos Y="38"/>
-        <UsageCount Value="7"/>
-      </Unit66>
-      <Unit67>
+        <UsageCount Value="6"/>
+      </Unit64>
+      <Unit65>
         <Filename Value="C:\Lazarus\fpc\3.0.2\source\rtl\win\wininc\redef.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="635"/>
         <CursorPos X="10" Y="652"/>
-        <UsageCount Value="7"/>
-      </Unit67>
-      <Unit68>
+        <UsageCount Value="6"/>
+      </Unit65>
+      <Unit66>
         <Filename Value="C:\Lazarus\fpc\3.0.2\source\rtl\win\wininc\func.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="596"/>
         <CursorPos X="10" Y="613"/>
-        <UsageCount Value="7"/>
-      </Unit68>
+        <UsageCount Value="6"/>
+      </Unit66>
     </Units>
-    <JumpHistory Count="30" HistoryIndex="29">
+    <JumpHistory Count="30" HistoryIndex="28">
       <Position1>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3039" Column="3" TopLine="3034"/>
+        <Caret Line="2524" Column="3" TopLine="2522"/>
       </Position1>
       <Position2>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3032" Column="3" TopLine="3012"/>
+        <Caret Line="2023" Column="20" TopLine="2016"/>
       </Position2>
       <Position3>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1933" Column="32" TopLine="1907"/>
+        <Caret Line="2034" Column="38" TopLine="2028"/>
       </Position3>
       <Position4>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="26" Column="14"/>
+        <Caret Line="2051" Column="40" TopLine="2039"/>
       </Position4>
       <Position5>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1047" Column="27" TopLine="1037"/>
+        <Caret Line="159" Column="17" TopLine="141"/>
       </Position5>
       <Position6>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3037" Column="3" TopLine="3035"/>
+        <Caret Line="2072" Column="3" TopLine="2070"/>
       </Position6>
       <Position7>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="141" Column="5" TopLine="124"/>
+        <Caret Line="2066" Column="81" TopLine="2057"/>
       </Position7>
       <Position8>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1951" Column="3" TopLine="1949"/>
+        <Caret Line="2050" Column="38" TopLine="2039"/>
       </Position8>
       <Position9>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1954" TopLine="1947"/>
+        <Caret Line="2187" Column="33" TopLine="2155"/>
       </Position9>
       <Position10>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3040" TopLine="3022"/>
+        <Caret Line="2184" Column="30" TopLine="2162"/>
       </Position10>
       <Position11>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1954" TopLine="1936"/>
+        <Caret Line="2212" Column="3" TopLine="2207"/>
       </Position11>
       <Position12>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3040" TopLine="3022"/>
+        <Caret Line="1939" Column="60" TopLine="1934"/>
       </Position12>
       <Position13>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1954" TopLine="1936"/>
+        <Caret Line="2044" Column="3" TopLine="2039"/>
       </Position13>
       <Position14>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3040" TopLine="3022"/>
+        <Caret Line="1641" Column="64" TopLine="1626"/>
       </Position14>
       <Position15>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3027" TopLine="3020"/>
+        <Caret Line="1675" Column="70" TopLine="1662"/>
       </Position15>
       <Position16>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3029" TopLine="3020"/>
+        <Caret Line="3657" Column="3" TopLine="3655"/>
       </Position16>
       <Position17>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3033" TopLine="3020"/>
+        <Caret Line="3626" Column="3" TopLine="3624"/>
       </Position17>
       <Position18>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3041" TopLine="3020"/>
+        <Caret Line="1673" Column="49" TopLine="1669"/>
       </Position18>
       <Position19>
-        <Filename Value="C:\lazarus\lcl\include\wincontrol.inc"/>
-        <Caret Line="5384" TopLine="5367"/>
+        <Filename Value="units\vpgantt.pas"/>
+        <Caret Line="3657" Column="3" TopLine="3655"/>
       </Position19>
       <Position20>
-        <Filename Value="C:\lazarus\lcl\include\control.inc"/>
-        <Caret Line="2125" TopLine="2108"/>
+        <Filename Value="units\vpgantt.pas"/>
+        <Caret Line="3645" Column="55" TopLine="3624"/>
       </Position20>
       <Position21>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1954" TopLine="1936"/>
+        <Caret Line="1687" Column="16" TopLine="1662"/>
       </Position21>
       <Position22>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1956" TopLine="1936"/>
+        <Caret Line="1669" Column="3" TopLine="1662"/>
       </Position22>
       <Position23>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1910" TopLine="1892"/>
+        <Caret Line="3657" Column="3" TopLine="3655"/>
       </Position23>
       <Position24>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1912" TopLine="1892"/>
+        <Caret Line="3626" Column="3" TopLine="3624"/>
       </Position24>
       <Position25>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1913" TopLine="1892"/>
+        <Caret Line="2161" Column="3" TopLine="2173"/>
       </Position25>
       <Position26>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="2084" TopLine="2066"/>
+        <Caret Line="2184" Column="31" TopLine="2163"/>
       </Position26>
       <Position27>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="2086" TopLine="2066"/>
+        <Caret Line="2116" Column="3" TopLine="2116"/>
       </Position27>
       <Position28>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1955" TopLine="1936"/>
+        <Caret Line="2018" Column="3" TopLine="2016"/>
       </Position28>
       <Position29>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="165" Column="17" TopLine="149"/>
+        <Caret Line="2544" Column="21" TopLine="2534"/>
       </Position29>
       <Position30>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3043" Column="17" TopLine="3035"/>
+        <Caret Line="2030" Column="3" TopLine="2028"/>
       </Position30>
     </JumpHistory>
   </ProjectSession>
@@ -682,13 +668,16 @@
         <InitialEnabled Value="False"/>
       </Item4>
     </BreakPoints>
-    <Watches Count="2">
+    <Watches Count="3">
       <Item1>
         <Expression Value="Ceil(FGridVisibleRect.Height / FvpGantt.RowHeight)"/>
       </Item1>
       <Item2>
         <Expression Value="FCalendarWidth - FHScrollPosition"/>
       </Item2>
+      <Item3>
+        <Expression Value="rRect.Hei"/>
+      </Item3>
     </Watches>
   </Debugging>
 </CONFIG>
