@@ -41,10 +41,12 @@ type
 
   TvpgOption = (vpgDrawFocusSelected,         //рисовать всегда выделение
                 vpgFocusHighlight,            //подсвечивать фокус, а не только рамку рисовать
-                vpgMajorVertGrids,            //рисовать вертикальные линии мажорной шкалы
-                vpgMinorVertGrids,            //рисовать вертикальные линии минорной шкалы
+                vpgMajorVertLine,             //рисовать вертикальные линии мажорной шкалы
+                vpgMinorVertLine,             //рисовать вертикальные линии минорной шкалы
                 vpgRowHighlight,              //рисовать подсветку всей строки
-                vpgMoveFocusToNewInterval     //перемещать фокус на добавленную строку
+                vpgMoveFocusToNewInterval,    //перемещать фокус на добавленную строку
+                vpgVertLine,                  //вертикальный бордюр в сетке
+                vpgHorzLine                   //горизонтальный бордюр в сетке
                 );
 
   TvpGanttOptions = set of TvpgOption;
@@ -78,7 +80,7 @@ const
   SCROLL_PAGE_DEFAULT = 100;
   constCellPadding: byte = 3;
   constRubberSpace: byte = 2;
-  DefaultGanttOptions = [vpgDrawFocusSelected, vpgFocusHighlight, vpgMajorVertGrids, vpgMinorVertGrids, vpgRowHighlight];
+  DefaultGanttOptions = [vpgDrawFocusSelected, vpgFocusHighlight, vpgMinorVertLine, vpgRowHighlight, vpgHorzLine, vpgVertLine];
 
 resourcestring
   RS_TITLE_TASKS = 'Задача';
@@ -147,11 +149,11 @@ type
       FTasksHeight: integer; //нужно для хранения высоты всей области
       FGridVisibleRect: TRect; //область видимых строк
       FGridTextHeight: integer;
+      FColor: TColor;
       //scrollbars
       FHScrollPosition: integer;
       FHSbVisible: boolean;
       //methods
-      function CalcFocusRect: TRect;
       procedure CalcGridVisibleRect;
       function CalcRowRect(aRow: integer): TRect;
       procedure CalcTasksWidth;
@@ -209,6 +211,7 @@ type
       FMinorScaleTitleRect: TRect;
       FPixelePerMinorScale: integer;
       FGridTextHeight: integer;
+      FColor: TColor;
       //scrollbars
       FHScrollPosition: integer;
       FVSbVisible: boolean;
@@ -291,10 +294,8 @@ type
       FIntervalsHeight: integer;
       FGanttBorderWidth: integer;
       FBorderColor: TColor;
-      FCalendarColor: TColor;
       FFocusColor: TColor;
       FRowHighlightColor: TColor;
-      FTaskColor: TColor;
       FTitleColor: TColor;
       FTaskTitleCaption: TCaption;
       FTitleFont: TFont;
@@ -304,13 +305,17 @@ type
       FFocusRow: integer;
       //methods
       procedure ClearDates;
+      function GetCalendarColor: TColor;
       function GetIntervalCount: Integer;
       function GetInterval(AnIndex: Integer): TvpInterval;
       function GetBorderWidth: integer;
+      function GetHorzBorderWidth: integer;
+      function GetVertBorderWidth: integer;
       function GetIntervalIndex: integer;
       function GetMajorScale: TvpTimeScale;
       function GetMinorScale: TvpTimeScale;
       function GetPixelPerMinorScale: integer;
+      function GetTaskColor: TColor;
       function GetTaskTitleCaption: TCaption;
       procedure OnTitleFontChanged(Sender: TObject);
       function OptionsIsStored: Boolean;
@@ -339,15 +344,20 @@ type
     protected
       procedure CalcIntervalsHeight;
       procedure CalcFocusRect;
+      procedure CutBorderFromRect(var aRect: TRect);
+      procedure CutHBorderFromRect(var aRect: TRect);
+      procedure CutVBorderFromRect(var aRect: TRect);
       function GetIntervalsHeight: integer; //высота всех интервалов
       function GetFocusRow: integer;
       function GetMajorScaleHeight: integer;
       function GetMinorScaleHeight: integer;
       function GetRowPosY(const YPos: integer): integer;
       function GetTitleHeight: integer;
-      procedure DrawThemedCell(ACanvas: TCanvas; aRect: TRect);
+      procedure DrawCellGrid(ACanvas: TCanvas; aRect: TRect);
+      procedure DrawCell(aRow: integer; ACanvas: TCanvas; aRect: TRect);
       procedure DrawFillRect(ACanvas:TCanvas; aRect: TRect);
       procedure DrawHighlightRect(ACanvas: TCanvas; ARect: TRect);
+      procedure DrawThemedCell(ACanvas: TCanvas; aRect: TRect);
       procedure DrawTitleGrid(ACanvas: TCanvas; aRect: TRect);
       procedure DrawTitleCell(ACanvas: TCanvas; aRect: TRect);
       procedure DrawTitleText(ACanvas: TCanvas; aRect: TRect; aText: string; aAligment: TAlignment = taLeftJustify);
@@ -413,10 +423,10 @@ type
       property TitleFont: TFont read FTitleFont write SetTitleFont;
       property TitleStyle: TTitleStyle read FTitleStyle write SetTitleStyle;
       //TODO Move this properties to child control OR stay this HOW RULES?
-      property TaskColor: TColor read FTaskColor write SetTaskColor default clWindow;
+      property TaskColor: TColor read GetTaskColor write SetTaskColor default clWindow;
       property TitleColor: TColor read FTitleColor write SetTitleColor default clBtnFace;
       property TaskTitleCaption: TCaption read GetTaskTitleCaption write SetTaskTitleCaption;
-      property CalendarColor:TColor read FCalendarColor write SetCalendarColor default clWindow;
+      property CalendarColor:TColor read GetCalendarColor write SetCalendarColor default clWindow;
   end;
 
   //draw
@@ -1585,7 +1595,7 @@ begin
   Form1.Debug('TvpGanttCalendar.DrawEdges');
   {$endif}
   {TODO -o Vas clear canvas in alone method}
-  Canvas.Brush.Color := FvpGantt.FTaskColor;
+  Canvas.Brush.Color := FColor;
   Canvas.FillRect(ClientRect);
   Canvas.Pen.Width := C_DEF_BORDER_WIDTH;
   Canvas.Pen.Style := psSolid;
@@ -1695,10 +1705,9 @@ end;
 
 procedure TvpGanttCalendar.DrawRow(const aRow: integer);
 var
-  rRect, fRect: TRect;
+  rRect, cRect: TRect;
   i: integer;
-  aBorderWidth: integer;
-  aMinorScaleWidth, aMajorScaleWidth: integer;
+  aMinorScaleWidth, aMajorScaleWidth, aBorderWidth: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawRow');
@@ -1721,38 +1730,45 @@ begin
       {$ifdef DBGGANTTCALENDAR}
       Form1.EL.Debug('Drawing row %d', [aRow]);
       {$endif}
+
+
+
+      FvpGantt.DrawCellGrid(Canvas, rRect);
+      //ячейка
+      Canvas.Font := Font;
+      Canvas.Brush.Color := FColor;
+      CopyRect(cRect, rRect);
+      //если рисуем вертикальные полосы и не рисуем разделения мажорной и минорной шкал
+      //то срезаем вертькальный бордюр из области
+      if (vpgVertLine in FvpGantt.Options) AND
+         ([vpgMajorVertLine, vpgMinorVertLine]*FvpGantt.Options=[]) then
+        FvpGantt.CutVBorderFromRect(cRect);
+      //нижний бордюр срезаем всегда (ну в зависимости от установленного флага)
+      FvpGantt.CutHBorderFromRect(cRect);
+      FvpGantt.DrawCell(aRow, Canvas, cRect);
       //если фокус, то зальем строку
       if aRow=FvpGantt.GetFocusRow then
         begin
           //если строку подсвечивать
-          fRect := CalcFocusRect;
-          FvpGantt.DrawHighlightRect(Canvas, fRect);
-          DrawFocusRect(aRow, fRect);
+          FvpGantt.DrawHighlightRect(Canvas, cRect);
+          //DrawFocusRect(aRow, rRect);
         end;
-      //устанавливаем шриф и рисуем
-      Canvas.Font := Font;
-      Canvas.Pen.Width := aBorderWidth;
-      Canvas.Pen.Style := psSolid;
-      Canvas.Pen.Color := FvpGantt.BorderColor;
-      Canvas.MoveTo(rRect.Left - 1, rRect.Bottom - aBorderWidth);
-      Canvas.LineTo(rRect.Right, rRect.Bottom - aBorderWidth);
-      Canvas.LineTo(rRect.Right, rRect.Top);
       //вертикальная разметка
       Canvas.Pen.Style := psDot;
-      if vpgMinorVertGrids in FvpGantt.Options then
+      if vpgMinorVertLine in FvpGantt.Options then
         begin
           for i:=1 to FMinorScaleCount-1 do
-            Canvas.Line(aMinorScaleWidth*i - aBorderWidth - FHScrollPosition,
+            Canvas.Line(aMinorScaleWidth*i - FHScrollPosition - 1,
                         rRect.Top,
-                        aMinorScaleWidth*i - aBorderWidth - FHScrollPosition,
+                        aMinorScaleWidth*i - FHScrollPosition - 1,
                         rRect.Bottom)
         end
-      else if vpgMajorVertGrids in FvpGantt.Options then
+      else if vpgMajorVertLine in FvpGantt.Options then
         begin
           for i:=1 to FMajorScaleCount-1 do
-            Canvas.Line(aMajorScaleWidth*i - aBorderWidth - FHScrollPosition,
+            Canvas.Line(aMajorScaleWidth*i - FHScrollPosition - 1,
                         rRect.Top,
-                        aMajorScaleWidth*i - aBorderWidth - FHScrollPosition,
+                        aMajorScaleWidth*i - FHScrollPosition - 1,
                         rRect.Bottom);
         end;
       ////считаем сдвиг и выводим текст
@@ -1971,7 +1987,7 @@ begin
    Form1.Debug('TvpGanttTasks.ClearCanvas');
   {$endif}
   //clear canvas
-  Canvas.Brush.Color := FvpGantt.FTaskColor;
+  Canvas.Brush.Color := FColor;
   Canvas.FillRect(ClientRect);
 end;
 
@@ -2011,18 +2027,6 @@ begin
       FvpGantt.SelectNextRow(-1);
       Result := True; // handled, no further scrolling by the widgetset
     end;
-end;
-
-function TvpGanttTasks.CalcFocusRect: TRect;
-begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.CalcFocusRect');
-  {$endif}
-  Result := FvpGantt.FFocusRect;
-  Result.Left := FGridVisibleRect.Left;
-  Result.Right := FGridVisibleRect.Right;
-  //срезаем невидимую часть области
-  IntersectRect(Result, Result, FGridVisibleRect);
 end;
 
 procedure TvpGanttTasks.CalcGridVisibleRect;
@@ -2154,9 +2158,8 @@ end;
 
 procedure TvpGanttTasks.DrawRow(aRow: integer);
 var
-  rRect, fRect: TRect;
+  rRect, cRect: TRect;
   textPoint: TPoint;
-  aBorderWidth: integer;
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.DrawRow');
@@ -2164,9 +2167,8 @@ begin
   if not Assigned(FvpGantt) then
     Exit;
   rRect := CalcRowRect(aRow);
-  aBorderWidth := FvpGantt.GetBorderWidth;
   {$ifdef DBGSCROLL}
-  Form1.EL.Debug('rRect.Left %d rRect.Top %d rRect.Right %d rRect.Bottom %d',
+  Form1.EL.Debug('Row rect Left %d Top %d Right %d Bottom %d',
                   [rRect.Left, rRect.Top, rRect.Right, rRect.Bottom]);
   Form1.EL.Debug('FVScrollPosition %d FHScrollPosition %d, ClientWidth %d, FGridVisibleRect.Height %d, FTasksWidth %d',
                   [FvpGantt.FVScrollPosition, FHScrollPosition, ClientWidth, FGridVisibleRect.Height, FTasksWidth]);
@@ -2176,31 +2178,24 @@ begin
       {$ifdef DBGGANTTTASKS}
       Form1.EL.Debug('Drawing row %d', [aRow]);
       {$endif}
+      //бордюр
+      FvpGantt.DrawCellGrid(Canvas, rRect);
+      //цвета
       Canvas.Font := Font;
-      //focus
+      Canvas.Brush.Color := FColor;
+      //ячейка cRect пока не рубим, будем рисовать несколько ячеек и оно нам пригодится
+      CopyRect(cRect, rRect);
+      FvpGantt.CutHBorderFromRect(cRect);
+      FvpGantt.DrawCell(aRow, Canvas, cRect);
+      //focus rectangle
       if aRow=FvpGantt.GetFocusRow then
-        begin
-          //если строку подсвечивать
-          fRect := CalcFocusRect;
-          {$ifdef DBGSCROLL}
-          Form1.EL.Debug('fRect.Left %d fRect.Top %d fRect.Right %d fRect.Bottom %d',
-                          [fRect.Left, fRect.Top, fRect.Right, fRect.Bottom]);
-          {$endif}
-          FvpGantt.DrawHighlightRect(Canvas, fRect);
-          DrawFocusRect(aRow, fRect);
-        end;
-      //бордюр и текст
-      Canvas.Pen.Width := aBorderWidth;
-      Canvas.Pen.Style := psSolid;
-      Canvas.Pen.Color := FvpGantt.BorderColor;
-      Canvas.MoveTo(rRect.Left - 1, rRect.Bottom - 1);
-      Canvas.LineTo(rRect.Right, rRect.Bottom - 1);
-      //Canvas.LineTo(rRect.Right - aBorderWidth, rRect.Top);
+        DrawFocusRect(aRow, cRect);
       //считаем сдвиг и выводим текст
-      InflateRect(rRect, -constCellPadding, -1);
-      textPoint.X := rRect.Left - FHScrollPosition;
-      textPoint.Y := rRect.Bottom - FGridTextHeight - (FvpGantt.RowHeight - FGridTextHeight) div 2;
-      Canvas.TextRect(rRect, textPoint.X, textPoint.Y, FvpGantt.Interval[aRow].Name);
+      {TODO -o Vas Сделать расчет вывода текста по вертикали в отдельной функции с учетом вертикальных и горизонтальных линий}
+      InflateRect(cRect, -constCellPadding, 0);
+      textPoint.X := cRect.Left - FHScrollPosition;
+      textPoint.Y := cRect.Bottom - FGridTextHeight - (FvpGantt.RowHeight - FvpGantt.GetHorzBorderWidth - FGridTextHeight) div 2;
+      Canvas.TextRect(cRect, textPoint.X, textPoint.Y, FvpGantt.Interval[aRow].Name);
     end;
 end;
 
@@ -2523,6 +2518,11 @@ begin
   FEndDate := 0;
 end;
 
+function TvpGantt.GetCalendarColor: TColor;
+begin
+  Result := FvpGanttCalendar.FColor;
+end;
+
 procedure TvpGantt.CalcIntervalsHeight;
 begin
   {$ifdef DBGGANTT}
@@ -2542,10 +2542,38 @@ begin
   {$EndIf}
   FFocusRect := ClientRect;
   FFocusRect.Top := FFocusRow * RowHeight + GetTitleHeight - FVScrollPosition;
-  FFocusRect.Height := RowHeight - GetBorderWidth;
+  if vpgHorzLine in Options then
+    FFocusRect.Height := RowHeight - GetBorderWidth;
+  if vpgVertLine in Options then
+    FFocusRect.Right := FFocusRect.Right - GetBorderWidth;
   {$ifdef DBGGANTTTASKS}
   Form1.EL.Debug('FFocusRect LTRB %d %d %d %d', [FFocusRect.Left, FFocusRect.Top, FFocusRect.Right, FFocusRect.Bottom]);
   {$EndIf}
+end;
+
+procedure TvpGantt.CutBorderFromRect(var aRect: TRect);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.CalcCellRectWoBorder');
+  {$EndIf}
+  CutHBorderFromRect(aRect);
+  CutVBorderFromRect(aRect);
+end;
+
+procedure TvpGantt.CutHBorderFromRect(var aRect: TRect);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.CutHBorderFromRect');
+  {$EndIf}
+  aRect.Bottom := aRect.Bottom - GetHorzBorderWidth;
+end;
+
+procedure TvpGantt.CutVBorderFromRect(var aRect: TRect);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.CutVBorderFromRect');
+  {$EndIf}
+  aRect.Right := aRect.Right - GetVertBorderWidth;
 end;
 
 function TvpGantt.GetIntervalsHeight: integer;
@@ -2773,9 +2801,9 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetTaskColor');
   {$endif}
-  if FTaskColor=AValue then
+  if FvpGanttTasks.FColor=AValue then
     Exit;
-  FTaskColor := AValue;
+  FvpGanttTasks.FColor := AValue;
   if FUpdateCount=0 then
     FvpGanttTasks.Invalidate;
 end;
@@ -2785,9 +2813,9 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetCalendarColor');
   {$endif}
-  if FCalendarColor=AValue then
+  if FvpGanttCalendar.FColor=AValue then
     Exit;
-  FCalendarColor := AValue;
+  FvpGanttCalendar.FColor := AValue;
   if (FUpdateCount=0) AND FvpGanttCalendar.HandleAllocated then
     FvpGanttCalendar.Invalidate;
 end;
@@ -3071,6 +3099,28 @@ begin
     Result := 0;
 end;
 
+function TvpGantt.GetHorzBorderWidth: integer;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.GetHorzBorderWidth');
+  {$endif}
+  if vpgHorzLine in Options then
+    Result := GetBorderWidth
+  else
+    Result := 0;
+end;
+
+function TvpGantt.GetVertBorderWidth: integer;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.GetVertBorderWidth');
+  {$endif}
+  if vpgVertLine in Options then
+    Result := GetBorderWidth
+  else
+    Result := 0;
+end;
+
 function TvpGantt.GetIntervalIndex: integer;
 begin
   {$ifdef DBGGANTT}
@@ -3118,6 +3168,11 @@ begin
     Result := FvpGanttCalendar.FPixelePerMinorScale
   else
     Result := C_DEF_PIXEL_PER_MINOR;
+end;
+
+function TvpGantt.GetTaskColor: TColor;
+begin
+  Result := FvpGanttTasks.FColor;
 end;
 
 function TvpGantt.GetStartIntervalDate: TDateTime;
@@ -3337,6 +3392,10 @@ begin
   {$endif}
 end;
 
+{ Функция вычисления номера строки под курсором мыши
+  @param YPos integer вертикальная координата мыши
+  @return integer номер строки под курсором, или -1 если кликнули по заголвку или пустому месту
+}
 function TvpGantt.GetRowPosY(const YPos: integer): integer;
 var
   aTH: integer;
@@ -3347,9 +3406,8 @@ begin
   {DONE Отработать правильное нажатие на титле, иначе ниже середины получаем 0 строку и соответственно
         переход на первую строку}
   aTH := GetTitleHeight;
-  if YPos > aTH then
-    Result := Trunc((YPos + FVScrollPosition - GetTitleHeight ) / RowHeight)
-  else
+  Result := Trunc((YPos + FVScrollPosition - GetTitleHeight ) / RowHeight);
+  if (YPos < aTH) OR (Result>IntervalCount-1) then
     Result := -1;
   {TODO Сделать обработку вычисления положения курсора на заголовке}
   //if thisTitle then
@@ -3396,7 +3454,7 @@ begin
   Width := C_VPGANTT_WIDTH;
   Height := C_VPGANTT_HEIGHT;
 
-  GanttBorderWidth := C_DEF_BORDER_WIDTH + 2;
+  GanttBorderWidth := C_DEF_BORDER_WIDTH + 4;
   TitleColor := clBtnFace;
   TaskColor := clWindow;
   CalendarColor := clWindow;
@@ -3575,6 +3633,28 @@ begin
   Form1.Debug('TvpGantt.GetTitleHeight');
   {$endif}
   Result := FMajorScaleHeight + FMinorScaleHeight;
+end;
+
+procedure TvpGantt.DrawCellGrid(ACanvas: TCanvas; aRect: TRect);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.DrawCellGrid');
+  {$endif}
+  //заливаем цветом бордюра
+  ACanvas.Brush.Style := bsSolid;
+  ACanvas.Brush.Color := FBorderColor;
+  DrawFillRect(ACanvas, aRect);
+end;
+
+procedure TvpGantt.DrawCell(aRow: integer; ACanvas: TCanvas; aRect: TRect);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.DrawCell');
+  {$endif}
+  ACanvas.Brush.Style := bsSolid;
+  DrawFillRect(ACanvas, aRect);
+  if aRow=FFocusRow then
+    DrawHighlightRect(Canvas, aRect);
 end;
 
 

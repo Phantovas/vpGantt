@@ -57,9 +57,14 @@ procedure TForm1.Button1Click(Sender: TObject);
 begin
   Debug('TForm1.Button1Click');
 
+  Panel4.Canvas.Pen.Width := 4;
+  Panel4.Canvas.Pen.Color := clLime;
+  PAnel4.Canvas.Line(0,2, Panel4.ClientWidth, 2);
+  Panel4.Canvas.Pen.Width := 1;
   Panel4.Canvas.Pen.Color := clREd;
-  Panel4.Canvas.Rectangle(0,0, 10,10);
-  Panel4.Canvas.Rectangle(10,10, Panel4.ClientWidth, Panel4.ClientHeight);
+  PAnel4.Canvas.Line(0,2, Panel4.ClientWidth, 2);
+  //Panel4.Canvas.Rectangle(0,0, 10,10);
+  //Panel4.Canvas.Rectangle(10,10, Panel4.ClientWidth, Panel4.ClientHeight);
   Memo1.Lines.Add('Panel4.ClientWidth ' + IntToStr(Panel4.ClientWidth));
   Memo1.Lines.Add('Panel4.ClientREct.Left ' + IntToStr(Panel4.ClientREct.LEft));
   Memo1.Lines.Add('Panel4.ClientREct.Right ' + IntToStr(Panel4.ClientREct.Right));
@@ -68,6 +73,9 @@ begin
   Memo1.Lines.Add('Panel4.ClientREct.Bottom ' + IntToStr(Panel4.ClientREct.Bottom));
   Memo1.Lines.Add('Panel4.ClientREct.Width ' + IntToStr(Panel4.ClientREct.Width));
   Memo1.Lines.Add('Panel4.ClientREct.HEight ' + IntToStr(Panel4.ClientREct.Height));
+
+  StringGrid1.GridLineWidth := StringGrid1.GridLineWidth +1;
+  Memo1.Lines.Add('StringGrid1.GridLineWidth ' + IntToStr(StringGrid1.GridLineWidth));
 
 end;
 
