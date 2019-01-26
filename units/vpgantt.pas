@@ -1633,47 +1633,27 @@ var
   aRect: TRect;
   aScaleName: string;
   i: integer;
-  aStartRange, aStopRange, aHScroll: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawMajorScale');
   {$endif}
-  aStartRange := 0;
-  aStopRange := 0;
-  aHScroll := FHScrollPosition;
   //берем нулевую область для старта
   aRect := Rect(0, 0, 0, FvpGantt.MajorScaleHeight);
+  aRect.Offset( - FHScrollPosition, 0);
   //перебираем все мажорные диапазоны
   for i:=0 to FMajorScaleCount-1 do
     begin
       aRect.Width := GetMajorScaleWidth(i);
-      //вычисляем где находится текущий диапазон относительно скрола
-      OffsetRect(aRect, -FHScrollPosition - 1, 0);
-      //если правая граница диапазона видится, с него начинаем
-      if aRect.Right>ClientRect.Left then
-        inc(aStartRange);
-      //если левая граница диапазона видится, то его включаем
-      //иначе он нам не нужен
-      if aRect.Left<ClientRect.Right then
-        aStopRange := i;
-    end;
-  {$ifdef DBGDRAW}
-  Form1.EL.Debug('DrawMajorStartStopRange %d %d', [aStartRange, aStopRange]);
-  {$endif}
-
-
-  //сдвигаем на горизонтальный скролинг, по вертикали двигать не будем заголовки
-  //и на кол-во прокрученных диспазонов - 1
-//  OffsetRect(aRect, GetMajorScaleWidth * aStartRange - FHScrollPosition , 0);
-  //перебираем все и рисуем
-  for i:=aStartRange to aStopRange-1 do
-    begin
-      aScaleName := GetTimeScaleName(FMajorScale, IncTime(FvpGantt.FStartIntervalDate, FMajorScale, i));
-      //рисуем
-      FvpGantt.DrawTitleCell(Canvas, aRect);
-      FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taLeftJustify);
-      //сдвигаем область
-      //OffsetRect(aRect, GetMajorScaleWidth, 0);
+      //если области пересекаются, то значит их рисовать
+      if aRect.IntersectsWith(ClientRect) then
+        begin
+          aScaleName := GetTimeScaleName(FMajorScale, IncTime(FvpGantt.FStartIntervalDate, FMajorScale, i));
+          //рисуем
+          FvpGantt.DrawTitleCell(Canvas, aRect);
+          FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taLeftJustify);
+        end;
+      //сдвигаем область на начало следующего диапазона
+      aRect.Offset(aRect.Width+1, 0);
     end;
 end;
 
