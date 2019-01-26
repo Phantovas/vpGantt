@@ -1,7 +1,7 @@
 unit vpGantt;
 
 {
-  TODO -o Vas :
+  TODO: -o Vas :
   1. Поравить отрисовку бордера в гриде, рисоват надо внутри ячейки
   2. Интервалы сделать как коллекцию. С возможностью задания для каждого интервала своих свойств
   3. Подумать о группах.
@@ -13,7 +13,8 @@ unit vpGantt;
 //{$define DBGGANTT}
 //{$define DBGGANTTTASKS}
 //{$define DBGGANTTCALENDAR}
-{$define DBGSCROLL}
+//{$define DBGSCROLL}
+{$define DBGDRAW}
 
 interface
 
@@ -144,7 +145,7 @@ type
     private
       FvpGantt: TvpGantt;
       //vars
-      {TODO -o Vas Сменить высоту и ширину на TRect}
+      {TODO: -o Vas Сменить высоту и ширину на TRect}
       FTasksWidth: integer;
       FTasksHeight: integer; //нужно для хранения высоты всей области
       FGridVisibleRect: TRect; //область видимых строк
@@ -205,6 +206,7 @@ type
       FMinorScale: TvpTimeScale;
       FMajorScaleCount: integer;
       FMinorScaleCount: integer;
+      FMinorCountInMajor: array of integer;
       FMajorScaleTitleRect: TRect;
       FMinorScaleTitleRect: TRect;
       FPixelePerMinorScale: integer;
@@ -222,7 +224,7 @@ type
       function CalcRowRect(const aRow: integer): TRect;
       procedure CalcScaleCount;
       function GetMajorScaleHeight: integer;
-      function GetMajorScaleWidth: integer;
+      function GetMajorScaleWidth(const aCurItem: integer): integer;
       function GetMinorScaleHeight: integer;
       function GetMinorScaleWidth: integer;
       procedure UpdateSBVisibility; deprecated;
@@ -420,7 +422,7 @@ type
       property StartDate: TDate read FStartDate write SetStartDate;
       property TitleFont: TFont read FTitleFont write SetTitleFont;
       property TitleStyle: TTitleStyle read FTitleStyle write SetTitleStyle;
-      //TODO Move this properties to child control OR stay this HOW RULES?
+      //TODO: Move this properties to child control OR stay this HOW RULES?
       property TaskColor: TColor read GetTaskColor write SetTaskColor default clWindow;
       property TitleColor: TColor read FTitleColor write SetTitleColor default clBtnFace;
       property TaskTitleCaption: TCaption read GetTaskTitleCaption write SetTaskTitleCaption;
@@ -1029,7 +1031,6 @@ begin
   //иначе если верхняя граница области выделения выше видимой области сетка,
   //то вычисляем значение скролла как:
   //текущая граница - верхняя граница сетки минус бордюром минус верхняя граница фокуса
-  {TODO -o Vas Почему - ширина границы грида, если он входит в ячейку ХЗ}
   else if FvpGantt.FFocusRect.Top<FGridVisibleRect.Top then
     curPos := curPos - (FGridVisibleRect.Top - FvpGantt.FFocusRect.Top);
   //не должно быть отрицательным
@@ -1062,14 +1063,38 @@ begin
 end;
 
 procedure TvpGanttCalendar.CalcScaleCount;
+var
+  i: integer;
+  aSDate, aEDate: TDateTime;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.CalcScale');
   {$endif}
-  if (FvpGantt.FStartIntervalDate=0) AND (FvpGantt.FEndIntervalDate=0) then
+  if (FvpGantt.FStartIntervalDate=0) OR (FvpGantt.FEndIntervalDate=0) then
     Exit;
   FMajorScaleCount := Round(UnitsBetweenDates(FvpGantt.FStartIntervalDate, FvpGantt.FEndIntervalDate, FMajorScale));
   FMinorScaleCount := Round(UnitsBetweenDates(FvpGantt.FStartIntervalDate, FvpGantt.FEndIntervalDate, FMinorScale));
+  //заполняем массив
+  SetLength(FMinorCountInMajor, FMajorScaleCount);
+  //считаем кол-во меньших диапазонов в большем, если меньший < vptsMonth, то кол-во диапазонов в нем будет разное
+  //т.к. в месяце раное кол-во дней, соответсвено и разное все что ниже месяца
+  //иначе одинаковое, т.к. в году 2 полугодия, 4 кавартала, 12 месяцев и получаем все обычным делением
+  if FMinorScale<vptsMonth then
+    begin
+      aSDate := FvpGantt.FStartIntervalDate;
+      for i:=0 to FMajorScaleCount-1 do
+        begin
+          aEDate := IncTime(aSDate, FMajorScale, 1);
+          FMinorCountInMajor[i] := Round(UnitsBetweenDates(aSDate, aEDate, FMinorScale));
+          aSDate := aEDate;
+        end;
+    end
+  else
+    begin
+      for i:=0 to FMajorScaleCount-1 do
+        FMinorCountInMajor[i] := FMinorScaleCount div FMinorScaleCount;
+    end;
+
   {$ifdef DBGGANTTCALENDAR}
   Form1.EL.Debug('Major scale count %d', [FMajorScaleCount]);
   Form1.EL.Debug('Minor scale count %d', [FMinorScaleCount]);
@@ -1136,12 +1161,15 @@ begin
   Result := FMajorScaleTitleRect.Height;
 end;
 
-function TvpGanttCalendar.GetMajorScaleWidth: integer;
+function TvpGanttCalendar.GetMajorScaleWidth(const aCurItem: integer): integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.GetMajorScaleWidth');
   {$endif}
-  Result := FPixelePerMinorScale * FMinorScaleCount;
+  if aCurItem>=FMajorScaleCount then
+    Result := 0
+  else
+    Result := FPixelePerMinorScale * FMinorCountInMajor[aCurItem];
 end;
 
 function TvpGanttCalendar.GetMinorScaleHeight: integer;
@@ -1362,8 +1390,8 @@ begin
   //Form1.Debug(Format('FVScrollPosition %d', [FVScrollPosition]));
   {$endif}
 
-  FvpGantt.CalcFocusRect;
-  FvpGantt.Invalidate;
+  //FvpGantt.CalcFocusRect;
+  FvpGantt.Repaint;
 end;
 
 procedure TvpGanttCalendar.WMLButtonDown(var message: TLMLButtonDown);
@@ -1605,25 +1633,38 @@ var
   aRect: TRect;
   aScaleName: string;
   i: integer;
-  aStartRange, aStopRange: integer;
+  aStartRange, aStopRange, aHScroll: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawMajorScale');
   {$endif}
-  //считаем кол-во минорных областей в одной мажорной области
-  //берем для начала всю клиентскую область
-  //длину вычисляем, высота будет равна заданной пользователем
-  aRect := Rect(0, 0, GetMajorScaleWidth, FvpGantt.MajorScaleHeight);
-  //считаем кол-во на которые прокручен скролл горизонтальный
-  aStartRange := Max(0, FHScrollPosition div GetMajorScaleWidth - 1);
-  //считаем кол-во видимых диапазонов
-  aStopRange := Min(((FHScrollPosition + ClientWidth) div GetMajorScaleWidth) + 1, FMajorScaleCount);
-  {$ifdef DBGGANTTCALENDAR}
+  aStartRange := 0;
+  aStopRange := 0;
+  aHScroll := FHScrollPosition;
+  //берем нулевую область для старта
+  aRect := Rect(0, 0, 0, FvpGantt.MajorScaleHeight);
+  //перебираем все мажорные диапазоны
+  for i:=0 to FMajorScaleCount-1 do
+    begin
+      aRect.Width := GetMajorScaleWidth(i);
+      //вычисляем где находится текущий диапазон относительно скрола
+      OffsetRect(aRect, -FHScrollPosition - 1, 0);
+      //если правая граница диапазона видится, с него начинаем
+      if aRect.Right>ClientRect.Left then
+        inc(aStartRange);
+      //если левая граница диапазона видится, то его включаем
+      //иначе он нам не нужен
+      if aRect.Left<ClientRect.Right then
+        aStopRange := i;
+    end;
+  {$ifdef DBGDRAW}
   Form1.EL.Debug('DrawMajorStartStopRange %d %d', [aStartRange, aStopRange]);
   {$endif}
+
+
   //сдвигаем на горизонтальный скролинг, по вертикали двигать не будем заголовки
   //и на кол-во прокрученных диспазонов - 1
-  OffsetRect(aRect, GetMajorScaleWidth * aStartRange - FHScrollPosition , 0);
+//  OffsetRect(aRect, GetMajorScaleWidth * aStartRange - FHScrollPosition , 0);
   //перебираем все и рисуем
   for i:=aStartRange to aStopRange-1 do
     begin
@@ -1632,7 +1673,7 @@ begin
       FvpGantt.DrawTitleCell(Canvas, aRect);
       FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taLeftJustify);
       //сдвигаем область
-      OffsetRect(aRect, GetMajorScaleWidth, 0);
+      //OffsetRect(aRect, GetMajorScaleWidth, 0);
     end;
 end;
 
@@ -1675,12 +1716,17 @@ var
   rowRect, cellRect, tmpRect: TRect;
   aMinorScaleWidth, aBorderWidth: integer;
   i: integer;
+  Dv, Dh: boolean;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawRow');
   {$endif}
   if not Assigned(FvpGantt) then
     Exit;
+  //опции
+  Dv := vpgVertLine in FvpGantt.Options;
+  Dh := vpgHorzLine in FvpGantt.Options;
+  //область строки
   rowRect := CalcRowRect(aRow);
   //получаем ширину бордюра и шкал
   aBorderWidth := FvpGantt.GetBorderWidth;
@@ -1715,15 +1761,14 @@ begin
           if tmpRect.Width>0 then
             begin
               FvpGantt.DrawCellGrid(Canvas, cellRect);
-              if (vpgVertLine in FvpGantt.Options) AND
-                 ([vpgMajorVertLine, vpgMinorVertLine]*FvpGantt.Options=[]) then
+              if Dv AND ([vpgMajorVertLine, vpgMinorVertLine]*FvpGantt.Options=[]) then
                 FvpGantt.CutVBorderFromRect(cellRect);
               //нижний бордюр срезаем всегда (ну в зависимости от установленного флага)
               FvpGantt.CutHBorderFromRect(cellRect);
               Canvas.Font := Font;
               Canvas.Brush.Color := FColor;
               FvpGantt.DrawCell(aRow, Canvas, cellRect);
-              if vpgMinorVertLine in FvpGantt.Options then
+              if Dv then
                 begin
                   Canvas.Pen.Style := psDot;
                   Canvas.Pen.Color := FvpGantt.BorderColor;
@@ -1731,7 +1776,7 @@ begin
                 end
               else if vpgMajorVertLine in FvpGantt.Options then
                 begin
-                  {TODO -o Vas Надо разобраться вот с этйо фигней. Особенно актуально ниже Месяца/день}
+                  {TODO: -o Vas Надо разобраться вот с этйо фигней. Особенно актуально ниже Месяца/день}
                   //if (i+1) mod FMinorPerMajorScale = 0 then
                     begin
                       Canvas.Pen.Style := psDot;
@@ -1918,6 +1963,10 @@ begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.Destroy');
   {$endif}
+  try
+    SetLength(FMinorCountInMajor, 0);
+  finally
+  end;
   inherited Destroy;
 end;
 
@@ -2137,8 +2186,9 @@ begin
   {$endif}
   if not Assigned(FvpGantt) then
     Exit;
+  //область строки
   rowRect := CalcRowRect(aRow);
-  {$ifdef DBGSCROLL}
+  {$ifdef DBGGANTTTASKS}
   Form1.EL.Debug('Row rect Left %d Top %d Right %d Bottom %d',
                   [rowRect.Left, rowRect.Top, rowRect.Right, rowRect.Bottom]);
   Form1.EL.Debug('FVScrollPosition %d FHScrollPosition %d, ClientWidth %d, FGridVisibleRect.Height %d, FTasksWidth %d',
@@ -2162,7 +2212,7 @@ begin
       if aRow=FvpGantt.GetFocusRow then
         FvpGantt.DrawFocusRect(Canvas, cellRect);
       //считаем сдвиг и выводим текст
-      {TODO -o Vas Сделать расчет вывода текста по вертикали в отдельной функции с учетом вертикальных и горизонтальных линий}
+      {TODO: -o Vas Сделать расчет вывода текста по вертикали в отдельной функции с учетом вертикальных и горизонтальных линий}
       InflateRect(cellRect, -constCellPadding, 0);
       textPoint.X := cellRect.Left - FHScrollPosition;
       textPoint.Y := cellRect.Bottom - FGridTextHeight - (FvpGantt.RowHeight - FvpGantt.GetHorzBorderWidth - FGridTextHeight) div 2;
@@ -3027,7 +3077,7 @@ begin
   FScrollBarHeight := GetSystemMetrics(SM_CYHSCROLL) +
                        GetSystemMetrics(SM_SWSCROLLBARSPACING);
 //считаем сдвиг по вертикали
-  {TODO -o Vas Надо как-то посчитать сдвиг по вертикали }
+  {TODO: -o Vas Надо как-то посчитать сдвиг по вертикали }
   //if FIntervalsHeight-FVScrollPosition<ClientHeight-GetTitleHeight then
   //  begin
   //    //находим разницу межку клинетской выстой и высотой всех строк - сдвиг
@@ -3380,7 +3430,7 @@ begin
   Result := Trunc((YPos + FVScrollPosition - GetTitleHeight ) / RowHeight);
   if (YPos < aTH) OR (Result>IntervalCount-1) then
     Result := -1;
-  {TODO Сделать обработку вычисления положения курсора на заголовке}
+  {TODO: Сделать обработку вычисления положения курсора на заголовке}
   //if thisTitle then
   //  DoTitleClick;
 end;
@@ -3614,7 +3664,7 @@ begin
   //заливаем цветом бордюра
   ACanvas.Brush.Style := bsSolid;
   ACanvas.Brush.Color := FBorderColor;
-  ACanvas.FillREct(aRect);
+  ACanvas.FillRect(aRect);
 end;
 
 procedure TvpGantt.DrawCell(aRow: integer; ACanvas: TCanvas; const aRect: TRect);
@@ -3770,7 +3820,7 @@ var
   aTextStyle: TTextStyle;
   textRect: TRect;
 begin
-  {TODO -o Vas Попробовать сделать для первого диапазона не прокручивающуюся надпись  }
+  {TODO: -o Vas Попробовать сделать для первого диапазона не прокручивающуюся надпись  }
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.DrawTitleText');
   {$endif}
