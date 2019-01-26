@@ -1653,7 +1653,7 @@ begin
           FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taLeftJustify);
         end;
       //сдвигаем область на начало следующего диапазона
-      aRect.Offset(aRect.Width+1, 0);
+      aRect.Offset(aRect.Width, 0);
     end;
 end;
 
@@ -1662,32 +1662,27 @@ var
   aRect: TRect;
   i: integer;
   aScaleName: string;
-  aStartRange, aStopRange: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawMinorScale');
   {$endif}
-  //находим область первого диапазона
+  //берем нулевую область для старта
   aRect := Rect(0, FvpGantt.MajorScaleHeight,
-                FPixelePerMinorScale,
-                FvpGantt.MajorScaleHeight + FvpGantt.MinorScaleHeight);
-  //считаем кол-во на которые прокручен скролл горизонтальный
-  aStartRange := Max(0, FHScrollPosition div GetMinorScaleWidth - 1);
-  //считаем кол-во видимых диапазонов
-  aStopRange := Min(((FHScrollPosition + ClientWidth) div GetMinorScaleWidth) + 1, FMinorScaleCount);
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.EL.Debug('DrawMinorStartStopRange %d %d', [aStartRange, aStopRange]);
-  {$endif}
-  //сдвигаем на горизонтальный скролинг, по вертикали двигать не будем заголовки
-  OffsetRect(aRect, GetMinorScaleWidth * aStartRange - FHScrollPosition , 0);
-  for i:=aStartRange to aStopRange-1 do
+                GetMinorScaleWidth, FvpGantt.MajorScaleHeight + FvpGantt.MinorScaleHeight);
+  aRect.Offset( - FHScrollPosition, 0);
+  //перебираем все мажорные диапазоны
+  for i:=0 to FMinorScaleCount-1 do
     begin
-      aScaleName := GetTimeScaleName(FMinorScale, IncTime(FvpGantt.FStartIntervalDate, FMinorScale, i));
-      //рисуем
-      FvpGantt.DrawTitleCell(Canvas, aRect);
-      FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taCenter);
-      //сдвигаем область
-      OffsetRect(aRect, FPixelePerMinorScale, 0);
+      //если области пересекаются, то значит их рисовать
+      if aRect.IntersectsWith(ClientRect) then
+        begin
+          aScaleName := GetTimeScaleName(FMinorScale, IncTime(FvpGantt.FStartIntervalDate, FMinorScale, i));
+          //рисуем
+          FvpGantt.DrawTitleCell(Canvas, aRect);
+          FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taCenter);
+        end;
+      //сдвигаем область на начало следующего диапазона
+      aRect.Offset(aRect.Width, 0);
     end;
 end;
 
