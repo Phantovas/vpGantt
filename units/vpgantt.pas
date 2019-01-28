@@ -36,6 +36,8 @@ const
   C_VPGANTT_HEIGHT = 150;
   C_TITLE_TEXT_INDENT = 3;
   C_ROW_HIGHLITE_VALUE = 50;
+  C_DEF_INTERVAL_PADDING = 5;
+  C_DEF_INTERVAL_RADIUS = 3;
 
 type
   TTitleStyle = (tsLazarus, tsStandard, tsNative);
@@ -78,7 +80,6 @@ type
                   vptsYear);
 
 const
-  SCROLL_PAGE_DEFAULT = 100;
   constCellPadding: byte = 3;
   constRubberSpace: byte = 2;
   DefaultGanttOptions = [vpgDrawFocusSelected, vpgFocusHighlight, vpgMajorVertLine, vpgRowHighlight, vpgHorzLine, vpgVertLine];
@@ -123,20 +124,24 @@ type
     private
       FvpGantt: TvpGantt;
       FPlanRect: TRect;  //область планируемого времени
-      FDurationRect: TRect;  //область фактического времени
+      FFactRect: TRect;  //область фактического времени
+      function GetFinishDate: TDateTime;
+      procedure SetDuration(AValue: Double);
       procedure SetFinishDate(AValue: TDateTime);
       procedure SetStartDate(AValue: TDateTime);
     protected
       procedure CalcPlanBound;
-      procedure CalcDurationBound;
+      procedure CalcFactBound;
     public
       constructor Create(AvpGantt: TvpGantt); virtual;
       destructor Destroy; override;
 
+      procedure DoDraw(ACanvas: TCanvas; const aRect: TRect; aDX: integer);
       procedure UpdateBounds;
     published
-      property SrartDate: TDateTime read FStartDate write SetStartDate;
-      property FinishDate: TDateTime read FFinishDate write SetFinishDate;
+      property StartDate: TDateTime read FStartDate write SetStartDate;
+      property FinishDate: TDateTime read GetFinishDate write SetFinishDate;
+      property Duration: Double read FDuration write SetDuration;
   end;
 
   { TvpGanttTasks }
@@ -241,6 +246,7 @@ type
       procedure DrawEdges;
       procedure DrawMajorScale;
       procedure DrawMinorScale;
+      procedure DrawInterval(const aRow: integer; aRect: TRect);
       procedure DrawRow(const aRow: integer);
       procedure DrawRows;
       procedure GetSBVisibility(out HsbVisible,VsbVisible:boolean);
@@ -269,6 +275,8 @@ type
   TvpGantt = class(TCustomControl)
     private
       FEndDate: TDate;
+      FFactIntervalColor: TColor;
+      FPlanIntervalColor: TColor;
       FStartDate: TDate;
       FvpGanttOptions: TvpGanttOptions;
       FvpGanttTasks: TvpGanttTasks;
@@ -319,6 +327,7 @@ type
       procedure OnTitleFontChanged(Sender: TObject);
       function OptionsIsStored: Boolean;
       procedure SetEndDate(AValue: TDate);
+      procedure SetFactIntervalColor(AValue: TColor);
       procedure SetFocusColor(AValue: TColor);
       procedure SetMajorScale(AValue: TvpTimeScale);
       procedure SetMajorScaleHeight(AValue: integer);
@@ -326,6 +335,7 @@ type
       procedure SetMinorScaleHeight(AValue: integer);
       procedure SetOptions(AValue: TvpGanttOptions);
       procedure SetPixelPerMinorScale(AValue: integer);
+      procedure SetPlanIntervalColor(AValue: TColor);
       procedure SetRowHeight(AValue: integer);
       procedure SetGanttBorderWidth(AValue: integer);
       procedure SetBorderColor(AValue: TColor);
@@ -386,8 +396,8 @@ type
       procedure RemoveInterval(AnInterval: TvpInterval);
       procedure UpdateInterval(AnIndex: Integer = -1);
 
-      function GetStartIntervalDate: TDateTime;
-      function GetEndIntervalDate: TDateTime;
+      function GetStartDateOfBound: TDateTime;
+      function GetEndDateOfBound: TDateTime;
       procedure UpdateDates;
 
       procedure BeginUpdate;
@@ -427,6 +437,8 @@ type
       property TitleColor: TColor read FTitleColor write SetTitleColor default clBtnFace;
       property TaskTitleCaption: TCaption read GetTaskTitleCaption write SetTaskTitleCaption;
       property CalendarColor:TColor read GetCalendarColor write SetCalendarColor default clWindow;
+      property PlanIntervalColor: TColor read FPlanIntervalColor write SetPlanIntervalColor default clSkyBlue;
+      property FactIntervalColor: TColor read FFactIntervalColor write SetFactIntervalColor default clBlue;
   end;
 
   //draw
@@ -913,10 +925,34 @@ begin
   {$ifdef DBGINTERVAL}
   Form1.Debug('TvpInterval.SetFinishDate');
   {$endif}
-  if FFinishDate = AValue then Exit;
+  if FFinishDate = AValue then
+    Exit;
   FFinishDate := AValue;
   //расчитываем области
-  CalcDurationBound;
+  CalcFactBound;
+end;
+
+procedure TvpInterval.SetDuration(AValue: Double);
+begin
+  {$ifdef DBGINTERVAL}
+  Form1.Debug('TvpInterval.SetDuration');
+  {$endif}
+  if FDuration = AValue then
+    Exit;
+  FDuration := AValue;
+  //расчитываем области
+  CalcPlanBound;
+end;
+
+function TvpInterval.GetFinishDate: TDateTime;
+begin
+  {$ifdef DBGINTERVAL}
+  Form1.Debug('TvpInterval.SetDuration');
+  {$endif}
+  if FFinishDate=0 then
+    Result := FStartDate + FDuration
+  else
+    Result := FFinishDate;
 end;
 
 { Процедура расчета области планируемой длительности интервала
@@ -930,7 +966,7 @@ begin
   {$ifdef DBGINTERVAL}
   Form1.Debug('TvpInterval.CalcLeftPlanBound');
   {$endif}
-  countTimeScale := UnitsBetweenDates(FvpGantt.GetStartIntervalDate, FStartDate, FvpGantt.MinorScale);
+  countTimeScale := UnitsBetweenDates(FvpGantt.GetStartDateOfBound, FStartDate, FvpGantt.MinorScale);
   FPlanRect.Left := Trunc(countTimeScale * FvpGantt.PixelPerMinorScale);
   if FDuration>0 then
     begin
@@ -947,7 +983,7 @@ end;
 { Процедура расчета области фактической длительности интервала
   Рассчитываем только в случае, если задана дата окончания интервала и она больше даты начала
 }
-procedure TvpInterval.CalcDurationBound;
+procedure TvpInterval.CalcFactBound;
 var
   countTimeScale: Double;
 begin
@@ -956,10 +992,12 @@ begin
   {$endif}
   if FFinishDate>FStartDate then
     begin
-      FDurationRect.Left := FPlanRect.Left;
+      FFactRect.Left := FPlanRect.Left;
       countTimeScale := UnitsBetweenDates(FStartDate, FFinishDate, FvpGantt.MinorScale);
-      FDurationRect.Width := Trunc(countTimeScale * FvpGantt.PixelPerMinorScale);
+      FFactRect.Width := Trunc(countTimeScale * FvpGantt.PixelPerMinorScale);
     end;
+  if FDuration=0 then
+    FPlanRect.Right := FFactRect.Right;
   {$ifdef DBGINTERVAL}
   Form1.EL.Debug('FDurationRect LTRB %d %d %d %d', [FDurationRect.Left, FDurationRect.Top, FDurationRect.Right, FDurationRect.Bottom]);
   {$endif}
@@ -975,7 +1013,11 @@ begin
   FvpGantt := AvpGantt;
   //initialize
   FPlanRect := Rect(0, 0, 0, 0);
-  FDurationRect := Rect(0, 0, 0, 0);
+  FFactRect := Rect(0, 0, 0, 0);
+  //dates
+  FStartDate := 0;
+  FFinishDate := 0;
+  FDuration := 0;
 end;
 
 { Разрушитель :)
@@ -988,17 +1030,57 @@ begin
   inherited Destroy;
 end;
 
+{TODO -o Vas: Не должны мы знать как рисоваться, пусть календарь сам и рисует ему виднее,
+мы ему только размер свой отдадим и все }
+procedure TvpInterval.DoDraw(ACanvas: TCanvas; const aRect: TRect; aDX: integer);
+var
+  drawRect: TRect;
+  oldBrush: TBrush;
+  oldPen: TPen;
+begin
+  {$ifdef DBGINTERVAL}
+  Form1.Debug('TvpInterval.DoDraw');
+  {$endif}
+  oldBrush := TBrush.Create;
+  oldPen := TPen.Create;
+  try
+    with ACanvas do
+      begin
+        //если строка смещена по скроллингу, то начало будет в "-"
+        drawRect.Left := FPlanRect.Left - aDX;
+        drawRect.Top := aRect.Top + C_DEF_INTERVAL_PADDING;
+        drawRect.Right := drawRect.Left + FPlanRect.Width;
+        drawRect.Bottom := aRect.Bottom - C_DEF_INTERVAL_PADDING;
+        //кисть и перо
+        oldBrush.Assign(Brush);
+        oldPen.Assign(Pen);
+        //рисуем
+        Brush.Style := bsSolid;
+        Brush.Color := FvpGantt.PlanIntervalColor;
+        Pen.Style := psSolid;
+        Pen.Color := cl3DDkShadow;
+        RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
+        //восстанавливаем кисть и перо
+        Brush.Assign(oldBrush);
+        Pen.Assign(oldPen);
+      end;
+  finally
+    oldBrush.Free;
+    oldPen.Free;
+  end;
+end;
+
 { Процедура пересчета границ интервала. Если сделаны изменения шкал, дат и кол-ва интервало
   то следует вызвать для каждого интервала данную процедуру, чтобы не тратить время на расчет при
   прорисовке календаря
 }
 procedure TvpInterval.UpdateBounds;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.ScrollBarShow');
+  {$ifdef DBGINTERVAL}
+  Form1.Debug('TvpInterval.UpdateBounds');
   {$endif}
   CalcPlanBound;
-  CalcDurationBound;
+  CalcFactBound;
 end;
 
 { TvpGanttCalendar }
@@ -1691,6 +1773,31 @@ begin
     end;
 end;
 
+procedure TvpGanttCalendar.DrawInterval(const aRow: integer; aRect: TRect);
+var
+  drawRect, planRect, factRect: TRect;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.DrawRow');
+  {$endif}
+  planRect := FvpGantt.Interval[aRow].FPlanRect;
+  factRect := FvpGantt.Interval[aRow].FFactRect;
+  //если строка смещена по скроллингу, то начало будет в "-"
+  drawRect.Left := planRect.Left - FHScrollPosition;
+  drawRect.Top := aRect.Top + C_DEF_INTERVAL_PADDING;
+  drawRect.Right := drawRect.Left + planRect.Width;
+  drawRect.Bottom := aRect.Bottom - C_DEF_INTERVAL_PADDING;
+  //кисть и перо
+  Canvas.Brush.Style := bsSolid;
+  Canvas.Brush.Color := FvpGantt.PlanIntervalColor;
+  Canvas.Pen.Style := psSolid;
+  Canvas.Pen.Color := cl3DShadow;
+  //рисуем
+  Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
+  Canvas.MoveTo(drawRect.Left + factRect.Width, drawRect.Top);
+  Canvas.LineTo(drawRect.Left + factRect.Width, drawRect.Bottom);
+end;
+
 { Процедура прорисовки строки.
   Рисуется только видимые диапазаоны. Для этого сначала вычисляется область всей строки
   с учетом горизонтально прокрутки. И проверяется ее высота, если она меньше или равна нулю, то эта
@@ -1788,6 +1895,8 @@ begin
                         end;
                     end;
                 end;
+              //рисуем интервал
+              DrawInterval(aRow, cellRect);
             end;
         end;
     end;
@@ -2624,12 +2733,23 @@ begin
     end;
 end;
 
+procedure TvpGantt.SetFactIntervalColor(AValue: TColor);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.SetFactIntervalColor');
+  {$endif}
+  if FFactIntervalColor = AValue then
+    Exit;
+  FFactIntervalColor := AValue;
+end;
+
 procedure TvpGantt.SetFocusColor(AValue: TColor);
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetFocusColor');
   {$endif}
-  if FFocusColor = AValue then Exit;
+  if FFocusColor = AValue then
+    Exit;
   FFocusColor := AValue;
   //DONE Сделать обновление области с фокусом
   InvalidateFocused;
@@ -2715,6 +2835,15 @@ begin
     Exit;
   FvpGanttCalendar.FPixelePerMinorScale := AValue;
   FvpGanttCalendar.Invalidate;
+end;
+
+procedure TvpGantt.SetPlanIntervalColor(AValue: TColor);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.SetPlanIntervalColor');
+  {$endif}
+  if FPlanIntervalColor = AValue then Exit;
+  FPlanIntervalColor := AValue;
 end;
 
 procedure TvpGantt.SetRowHeight(AValue: integer);
@@ -3154,7 +3283,7 @@ begin
   Result := FvpGanttTasks.FColor;
 end;
 
-function TvpGantt.GetStartIntervalDate: TDateTime;
+function TvpGantt.GetStartDateOfBound: TDateTime;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.GetStartIntervalDate');
@@ -3162,7 +3291,7 @@ begin
   Result := FStartDateOfBound;
 end;
 
-function TvpGantt.GetEndIntervalDate: TDateTime;
+function TvpGantt.GetEndDateOfBound: TDateTime;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.GetEndIntervalDate');
@@ -3441,6 +3570,9 @@ begin
   ScrollBars := ssAutoBoth;
   FRowHighlightColor :=  GetHighLightColor(clHighlight, C_ROW_HIGHLITE_VALUE);
 
+  FPlanIntervalColor := clSkyBlue;
+  FFactIntervalColor := clBlue;
+
   RowHeight := C_DEF_ROW_HEIGHT;
   MajorScaleHeight := C_DEF_ROW_HEIGHT;
   MinorScaleHeight := C_DEF_ROW_HEIGHT;
@@ -3556,8 +3688,8 @@ begin
   {$endif}
   //изменяются даты, пересчитаем только в случае если календарь создан
   if AnIndex>=0 then
-    UpdateBoundDates(TvpInterval(FIntervals[AnIndex]).FStartDate,
-                        TvpInterval(FIntervals[AnIndex]).FFinishDate);
+    UpdateBoundDates(TvpInterval(FIntervals[AnIndex]).StartDate,
+                        TvpInterval(FIntervals[AnIndex]).FinishDate);
   VisualChange;
 end;
 
@@ -3703,7 +3835,7 @@ begin
 end;
 
 
-procedure TvpGantt.DrawHighlightRect(ACanvas: TCanvas; const ARect: TRect);
+procedure TvpGantt.DrawHighlightRect(ACanvas: TCanvas; const aRect: TRect);
 var
   aOldBrush: TBrush;
 begin
