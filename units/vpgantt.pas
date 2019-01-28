@@ -1024,17 +1024,22 @@ begin
   {$EndIf}
   curPos := GetScrollPos(Handle, SB_VERT);
   //если нижняя граница области рисования фокуса ниже низа клиентской области
-  //то устанавливаем скролл ниже на позицию: текущая позиция + разница между нижними
-  //границами фокуса и клиентской области, пока еще с учетом ширины границы бордюра
+  //то прокручиваем на ширину строки
   if FvpGantt.FFocusRect.Bottom>ClientRect.Bottom then
-    curPos := curPos + (FvpGantt.FFocusRect.Bottom - ClientRect.Bottom)
+    begin
+      curPos := curPos + FvpGantt.RowHeight;
+      //не должно быть > максимальногго диспазона прокрутки диапазон скрола - высота страницы скрола - 1
+      curPos := Min(curPos, FCalendarHeight - ClientHeight);
+    end
   //иначе если верхняя граница области выделения выше видимой области сетка,
-  //то вычисляем значение скролла как:
-  //текущая граница - верхняя граница сетки минус бордюром минус верхняя граница фокуса
+  //то прокручиваем ширину строки
   else if FvpGantt.FFocusRect.Top<FGridVisibleRect.Top then
-    curPos := curPos - (FGridVisibleRect.Top - FvpGantt.FFocusRect.Top);
-  //не должно быть отрицательным
-  curPos := Max(0, curPos);
+    begin
+      curPos := curPos - FvpGantt.RowHeight;
+      //не должно быть отрицательным, т.е. если сдвинуты на пол строки и дошли до последней, то крутатнуть надо до 0,
+      //а никак не в отрицательную позицию
+      curPos := Max(0, curPos);
+    end;
   //шлем сообщение о прокрутке на нужную величину
   SendMessage(Handle, LM_VSCROLL, MakeWParam(SB_THUMBPOSITION, curPos), 0);
 
@@ -1878,7 +1883,7 @@ begin
   HsbPos := 0;
   if HsbVisible then
     begin
-      HsbRange := FCalendarWidth - 1; //1 - ширина обводки, ее рисуем всегда
+      HsbRange := FCalendarWidth;
       HsbPage := ClientWidth;
     end;
 
@@ -1886,8 +1891,8 @@ begin
   VsbPos := 0;
   if VsbVisible then
     begin
-      VsbRange := FCalendarHeight - 1; //1 - ширина обводки, ее рисуем всегда
-      VsbPage := ClientHeight - FvpGantt.IntervalCount*FvpGantt.GetBorderWidth;
+      VsbRange := FCalendarHeight;
+      VsbPage := ClientHeight;
     end;
 
   {$ifdef DBGSCROLL}
