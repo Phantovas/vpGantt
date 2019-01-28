@@ -282,8 +282,8 @@ type
       FFocusRect: TRect;
 
       FIntervals: TList;
-      FStartIntervalDate: TDateTime;
-      FEndIntervalDate: TDateTime;
+      FStartDateOfBound: TDateTime;
+      FEndDateOfBound: TDateTime;
 
       FUpdateCount: integer;
 
@@ -371,7 +371,7 @@ type
       function  ScrollBarAutomatic(Which: TScrollStyle): boolean;
       procedure SetFocusRow(AValue: integer);
       procedure SelectNextRow(const ADelta: integer);
-      procedure UpdateIntervalDates(AStartDate, AEndDate: TDate);
+      procedure UpdateBoundDates(AStartDate, AEndDate: TDate);
       procedure VisualChange;
     public
       constructor Create(AOwner: TComponent); override;
@@ -1075,10 +1075,10 @@ begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.CalcScale');
   {$endif}
-  if (FvpGantt.FStartIntervalDate=0) OR (FvpGantt.FEndIntervalDate=0) then
+  if (FvpGantt.FStartDateOfBound=0) OR (FvpGantt.FEndDateOfBound=0) then
     Exit;
-  FMajorScaleCount := Round(UnitsBetweenDates(FvpGantt.FStartIntervalDate, FvpGantt.FEndIntervalDate, FMajorScale));
-  FMinorScaleCount := Round(UnitsBetweenDates(FvpGantt.FStartIntervalDate, FvpGantt.FEndIntervalDate, FMinorScale));
+  FMajorScaleCount := Round(UnitsBetweenDates(FvpGantt.FStartDateOfBound, FvpGantt.FEndDateOfBound, FMajorScale));
+  FMinorScaleCount := Round(UnitsBetweenDates(FvpGantt.FStartDateOfBound, FvpGantt.FEndDateOfBound, FMinorScale));
   //заполняем массив
   SetLength(FMinorCountInMajor, FMajorScaleCount);
   //считаем кол-во меньших диапазонов в большем, если меньший < vptsMonth, то кол-во диапазонов в нем будет разное
@@ -1086,7 +1086,7 @@ begin
   //иначе одинаковое, т.к. в году 2 полугодия, 4 кавартала, 12 месяцев и получаем все обычным делением
   if FMinorScale<vptsMonth then
     begin
-      aSDate := FvpGantt.FStartIntervalDate;
+      aSDate := FvpGantt.FStartDateOfBound;
       for i:=0 to FMajorScaleCount-1 do
         begin
           aEDate := IncTime(aSDate, FMajorScale, 1);
@@ -1652,7 +1652,7 @@ begin
       //если области пересекаются, то значит их рисовать
       if aRect.IntersectsWith(ClientRect) then
         begin
-          aScaleName := GetTimeScaleName(FMajorScale, IncTime(FvpGantt.FStartIntervalDate, FMajorScale, i));
+          aScaleName := GetTimeScaleName(FMajorScale, IncTime(FvpGantt.FStartDateOfBound, FMajorScale, i));
           //рисуем
           FvpGantt.DrawTitleCell(Canvas, aRect);
           FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taLeftJustify);
@@ -1681,7 +1681,7 @@ begin
       //если области пересекаются, то значит их рисовать
       if aRect.IntersectsWith(ClientRect) then
         begin
-          aScaleName := GetTimeScaleName(FMinorScale, IncTime(FvpGantt.FStartIntervalDate, FMinorScale, i));
+          aScaleName := GetTimeScaleName(FMinorScale, IncTime(FvpGantt.FStartDateOfBound, FMinorScale, i));
           //рисуем
           FvpGantt.DrawTitleCell(Canvas, aRect);
           FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taCenter);
@@ -1691,12 +1691,22 @@ begin
     end;
 end;
 
+{ Процедура прорисовки строки.
+  Рисуется только видимые диапазаоны. Для этого сначала вычисляется область всей строки
+  с учетом горизонтально прокрутки. И проверяется ее высота, если она меньше или равна нулю, то эта
+  строка не попадает в область ClientRect компонента FvpGanttCalendar. Таким образом отрисовываем только
+  строки из видимого диапазона.
+  Аналогично рисуем диапазоны. Берем области с заданной шириной aMinorScaleWidth
+  и смотрим, если диапазон попадает в видимую область FvpGanttCalendar, то
+  отрисовываем его, иначе идем дальше.
+  Так мы рисуем только размер канваса FvpGanttCalrndar, что очень быстро и не тупит скролл.
+}
 procedure TvpGanttCalendar.DrawRow(const aRow: integer);
 var
   rowRect, cellRect, tmpRect: TRect;
-  aMinorScaleWidth, aBorderWidth: integer;
-  i: integer;
-  Dv, Dh: boolean;
+  aMinorScaleWidth: integer;
+  i, j, prevMinorInMajor: integer;
+  Dv, NeedDrawMajorBorder: boolean;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawRow');
@@ -1704,13 +1714,12 @@ begin
   if not Assigned(FvpGantt) then
     Exit;
   //опции
-  Dv := vpgVertLine in FvpGantt.Options;
-  Dh := vpgHorzLine in FvpGantt.Options;
+  prevMinorInMajor := 0;
+  NeedDrawMajorBorder := false;
   //область строки
   rowRect := CalcRowRect(aRow);
-  //получаем ширину бордюра и шкал
-  aBorderWidth := FvpGantt.GetBorderWidth;
   aMinorScaleWidth := GetMinorScaleWidth;
+  Dv := vpgVertLine in FvpGantt.Options;
   {$ifdef DBGSCROLL}
   Form1.EL.Debug('Calendar rRect.Left %d rRect.Top %d rRect.Right %d rRect.Bottom %d',
                   [rowRect.Left, rowRect.Top, rowRect.Right, rowRect.Bottom]);
@@ -1722,9 +1731,22 @@ begin
       {$ifdef DBGGANTTCALENDAR}
       Form1.EL.Debug('Drawing row %d', [aRow]);
       {$endif}
+      j := 0; //начинаем рисовать с первой мажорной шкалы
       //нужно нарисовать строку по ячейкам старшей или младшей шкалы
       for i:=0 to FMinorScaleCount - 1 do
         begin
+          //ищем текущую мажорную шкалу
+          if (i+1) mod (prevMinorInMajor + FMinorCountInMajor[j])=0 then
+            begin
+              //запоминаем сколько в ней было минорных диапазонов
+              prevMinorInMajor := FMinorCountInMajor[j];
+              //переходим к значениям следующей шкалы
+              inc(j);
+              //разрешаем рисовать вертикальную полосу
+              NeedDrawMajorBorder := true;
+            end
+          else
+            NeedDrawMajorBorder := false;
           //устанавливаем размер области = размеру области строки
           cellRect := rowRect;
           //вычисляем с учетом сдвига, ширина будет равна FPixelePerMinorScale;
@@ -1741,77 +1763,33 @@ begin
           if tmpRect.Width>0 then
             begin
               FvpGantt.DrawCellGrid(Canvas, cellRect);
+              Canvas.Font := Font;
+              Canvas.Brush.Color := FColor;
               if Dv AND ([vpgMajorVertLine, vpgMinorVertLine]*FvpGantt.Options=[]) then
                 FvpGantt.CutVBorderFromRect(cellRect);
               //нижний бордюр срезаем всегда (ну в зависимости от установленного флага)
               FvpGantt.CutHBorderFromRect(cellRect);
-              Canvas.Font := Font;
-              Canvas.Brush.Color := FColor;
               FvpGantt.DrawCell(aRow, Canvas, cellRect);
               if Dv then
                 begin
-                  Canvas.Pen.Style := psDot;
-                  Canvas.Pen.Color := FvpGantt.BorderColor;
-                  Canvas.Line(cellRect.Right-1, cellRect.Top, cellRect.Right-1, cellRect.Bottom);
-                end
-              else if vpgMajorVertLine in FvpGantt.Options then
-                begin
-                  {TODO: -o Vas Надо разобраться вот с этйо фигней. Особенно актуально ниже Месяца/день}
-                  //if (i+1) mod FMinorPerMajorScale = 0 then
+                  if vpgMinorVertLine in FvpGantt.Options then
                     begin
                       Canvas.Pen.Style := psDot;
                       Canvas.Pen.Color := FvpGantt.BorderColor;
                       Canvas.Line(cellRect.Right-1, cellRect.Top, cellRect.Right-1, cellRect.Bottom);
+                    end
+                  else if vpgMajorVertLine in FvpGantt.Options then
+                    begin
+                      if NeedDrawMajorBorder then
+                        begin
+                          Canvas.Pen.Style := psDot;
+                          Canvas.Pen.Color := FvpGantt.BorderColor;
+                          Canvas.Line(cellRect.Right-1, cellRect.Top, cellRect.Right-1, cellRect.Bottom);
+                        end;
                     end;
                 end;
             end;
         end;
-
-
-
-      //    for i:=1 to  do
-      //      Canvas.Line(aMinorScaleWidth*i - FHScrollPosition - 1,
-      //                  rowRect.Top,
-      //                  aMinorScaleWidth*i - FHScrollPosition - 1,
-      //                  rowRect.Bottom)
-      //  end
-      //else if  then
-      //  begin
-      //    for i:=1 to FMajorScaleCount-1 do
-      //      Canvas.Line(aMajorScaleWidth*i - FHScrollPosition - 1,
-      //                  rowRect.Top,
-      //                  aMajorScaleWidth*i - FHScrollPosition - 1,
-      //                  rowRect.Bottom);
-      //  end;
-      //
-      //FvpGantt.DrawCellGrid(Canvas, rowRect);
-      ////ячейка
-      //Canvas.Font := Font;
-      //Canvas.Brush.Color := FColor;
-      //CopyRect(cellRect, rowRect);
-      ////если рисуем вертикальные полосы и не рисуем разделения мажорной и минорной шкал
-      ////то срезаем вертькальный бордюр из области
-      //if (vpgVertLine in FvpGantt.Options) AND
-      //   ([vpgMajorVertLine, vpgMinorVertLine]*FvpGantt.Options=[]) then
-      //  FvpGantt.CutVBorderFromRect(cellRect);
-      ////нижний бордюр срезаем всегда (ну в зависимости от установленного флага)
-      //FvpGantt.CutHBorderFromRect(cellRect);
-      //FvpGantt.DrawCell(aRow, Canvas, cellRect);
-      ////если фокус, то зальем строку
-      //if aRow=FvpGantt.GetFocusRow then
-      //  begin
-      //    //если строку подсвечивать
-      //    FvpGantt.DrawHighlightRect(Canvas, cellRect);
-      //    //DrawFocusRect(aRow, rowRect);
-      //  end;
-      ////вертикальная разметка
-      //Canvas.Pen.Style := psDot;
-      //////считаем сдвиг и выводим текст
-      ////textPoint.X := rowRect.Left + constCellPadding - FHScrollPosition;
-      ////textPoint.Y := rowRect.Bottom - FGridTextHeight - (FvpGantt.RowHeight - FGridTextHeight) div 2;
-      ////Canvas.TextRect(rowRect, textPoint.X, textPoint.Y, FvpGantt.Interval[aRow].Name);
-      ////rowRect.Top := Round(rowRect.Top + (rowRect.Height - Canvas.TextHeight('A'))/2);
-      ////Canvas.TextRect(rowRect, rowRect.Left + constCellPadding, rowRect.Top, FvpGantt.Interval[aRow].Name);
     end;
 end;
 
@@ -2641,7 +2619,7 @@ begin
       FEndDate := aDT;
       if FEndDate<FStartDate then
         FStartDate := StartOfTheDay(aDT);
-      UpdateIntervalDates(FStartDate, FEndDate);
+      UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
 end;
@@ -2673,7 +2651,7 @@ begin
   else
     begin
       FvpGanttCalendar.FMajorScale := AValue;
-      UpdateIntervalDates(FStartDate, FEndDate);
+      UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
 end;
@@ -2694,7 +2672,7 @@ begin
   else
     begin
       FvpGanttCalendar.FMinorScale := AValue;
-      UpdateIntervalDates(FStartDate, FEndDate);
+      UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
 end;
@@ -2792,7 +2770,7 @@ begin
       FStartDate := aDT;
       if FStartDate>FEndDate then
         FEndDate := EndOfTheDay(aDT);
-      UpdateIntervalDates(FStartDate, FEndDate);
+      UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
 end;
@@ -3181,7 +3159,7 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.GetStartIntervalDate');
   {$endif}
-  Result := FStartIntervalDate;
+  Result := FStartDateOfBound;
 end;
 
 function TvpGantt.GetEndIntervalDate: TDateTime;
@@ -3189,7 +3167,7 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.GetEndIntervalDate');
   {$endif}
-  Result := FEndIntervalDate;
+  Result := FEndDateOfBound;
 end;
 
 { Процедура пересчета временных переменных
@@ -3202,8 +3180,8 @@ begin
   Form1.Debug('TvpGantt.GetMajorScale');
   {$endif}
   //обнуляем время
-  FStartIntervalDate := 0;
-  FEndIntervalDate := 0;
+  FStartDateOfBound := 0;
+  FEndDateOfBound := 0;
   //расчитываем по новой для каждого интервала
   for i:=0 to IntervalCount-1 do
     UpdateInterval(i);
@@ -3310,7 +3288,7 @@ end;
     2) при смене любой из шкал
     3) при измненении интервалов
 }
-procedure TvpGantt.UpdateIntervalDates(AStartDate, AEndDate: TDate);
+procedure TvpGantt.UpdateBoundDates(AStartDate, AEndDate: TDate);
 var
   aSYear, aSMonth, aSDay: word;
   aEYear, aEMonth, aEDay: word;
@@ -3332,54 +3310,54 @@ begin
     //минуты быть не могут, но возьмем и их
     vptsMinute, vptsDecMinute, vptsHour, vptsDay, vptsDayWeek:
       begin
-       FStartIntervalDate := StartOfADay(aSYear, aSMonth, aSDay);
-       FEndIntervalDate := EndOfADay(aEYear, aEMonth, aEDay);
+       FStartDateOfBound := StartOfADay(aSYear, aSMonth, aSDay);
+       FEndDateOfBound := EndOfADay(aEYear, aEMonth, aEDay);
       end;
     //недели
     vptsWeek, vptsWeekNum, vptsWeekNumPlain:
       begin
-        FStartIntervalDate := StartOfAWeek(aSYear, aSMonth, aSDay);
-        FEndIntervalDate := EndOfAWeek(aEYear, aEMonth, aEDay);
+        FStartDateOfBound := StartOfAWeek(aSYear, aSMonth, aSDay);
+        FEndDateOfBound := EndOfAWeek(aEYear, aEMonth, aEDay);
       end;
     //месяц
     vptsMonth:
       begin
-        FStartIntervalDate := StartOfAMonth(aSYear, aSMonth);
-        FEndIntervalDate := EndOfAMonth(aEYear, aEMonth);
+        FStartDateOfBound := StartOfAMonth(aSYear, aSMonth);
+        FEndDateOfBound := EndOfAMonth(aEYear, aEMonth);
       end;
     //квартал
     vptsQuarter:
       begin
         case aSMonth of
-          1..3: FStartIntervalDate := StartOfAMonth(aSYear, 1);
-          4..6: FStartIntervalDate := StartOfAMonth(aSYear, 4);
-          7..9: FStartIntervalDate := StartOfAMonth(aSYear, 7);
-          10..12: FStartIntervalDate := StartOfAMonth(aSYear, 10);
+          1..3: FStartDateOfBound := StartOfAMonth(aSYear, 1);
+          4..6: FStartDateOfBound := StartOfAMonth(aSYear, 4);
+          7..9: FStartDateOfBound := StartOfAMonth(aSYear, 7);
+          10..12: FStartDateOfBound := StartOfAMonth(aSYear, 10);
         end;
         case aSMonth of
-          1..3: FEndIntervalDate := EndOfAMonth(aEYear, 3);
-          4..6: FEndIntervalDate := EndOfAMonth(aEYear, 6);
-          7..9: FEndIntervalDate := EndOfAMonth(aEYear, 9);
-          10..12: FEndIntervalDate := EndOfAMonth(aEYear, 12);
+          1..3: FEndDateOfBound := EndOfAMonth(aEYear, 3);
+          4..6: FEndDateOfBound := EndOfAMonth(aEYear, 6);
+          7..9: FEndDateOfBound := EndOfAMonth(aEYear, 9);
+          10..12: FEndDateOfBound := EndOfAMonth(aEYear, 12);
         end;
       end;
     //полугодия
     vptsHalfYear:
       if aSMonth<7 then
         begin
-          FStartIntervalDate := StartOfAMonth(aSYear, 1);
-          FEndIntervalDate := EndOfAMonth(aEYear, 6);
+          FStartDateOfBound := StartOfAMonth(aSYear, 1);
+          FEndDateOfBound := EndOfAMonth(aEYear, 6);
         end
       else
         begin
-          FStartIntervalDate := StartOfAMonth(aSYear, 7);
-          FEndIntervalDate := EndOfAMonth(aEYear, 12);
+          FStartDateOfBound := StartOfAMonth(aSYear, 7);
+          FEndDateOfBound := EndOfAMonth(aEYear, 12);
         end;
     //года
     vptsYear:
       begin
-        FStartIntervalDate := StartOfAYear(aSYear);
-        FEndIntervalDate := EndOfAYear(aEYear);
+        FStartDateOfBound := StartOfAYear(aSYear);
+        FEndDateOfBound := EndOfAYear(aEYear);
       end;
   end;
   //пересчитываем значения календаря
@@ -3455,7 +3433,7 @@ begin
   Width := C_VPGANTT_WIDTH;
   Height := C_VPGANTT_HEIGHT;
 
-  GanttBorderWidth := C_DEF_BORDER_WIDTH + 4;
+  GanttBorderWidth := C_DEF_BORDER_WIDTH;
   TitleColor := clBtnFace;
   TaskColor := clWindow;
   CalendarColor := clWindow;
@@ -3578,7 +3556,7 @@ begin
   {$endif}
   //изменяются даты, пересчитаем только в случае если календарь создан
   if AnIndex>=0 then
-    UpdateIntervalDates(TvpInterval(FIntervals[AnIndex]).FStartDate,
+    UpdateBoundDates(TvpInterval(FIntervals[AnIndex]).FStartDate,
                         TvpInterval(FIntervals[AnIndex]).FFinishDate);
   VisualChange;
 end;
