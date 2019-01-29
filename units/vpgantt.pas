@@ -1,4 +1,32 @@
-unit vpGantt;
+{
+/******************************************************************************/
+                            vpGantt.pas
+                            -----------
+
+                     Gantt Diagramm component unit
+                Drawing a gantt diagramm from an interval list.
+--------------------------------------------------------------------------------
+
+@git https://github.com/Phantovas/vpGantt
+
+@https https://github.com/Phantovas/vpGantt.git
+@ssh git@github.com:Phantovas/vpGantt.git
+
+@Author:: Vasiliy Ponomarjov
+@Email: phantovas@gmail.com
+@created: 06-JAN-2019
+@modified: 29-JAN-2019
+@version: 0.3a
+
+/******************************************************************************/
+ This file is part of the Lazarus Component Library (LCL)
+
+ See the file COPYING.modifiedLGPL.txt, included in this distribution,
+ for details about the license.
+
+/******************************************************************************/
+}
+
 
 {
   TODO: -o Vas :
@@ -7,14 +35,18 @@ unit vpGantt;
   3. Подумать о группах.
   4. ЕСли будут группы, то тогда можно UpdateDates делать по группам, а в группах обновлять максимальную и минимальные даты
      при добавлении интервалов.
+  5. Clear для очистки всех интервалов
 }
+
+
+unit vpGantt;
 
 //{$define DBGINTERVAL}
 //{$define DBGGANTT}
 //{$define DBGGANTTTASKS}
 //{$define DBGGANTTCALENDAR}
 //{$define DBGSCROLL}
-{$define DBGDRAW}
+//{$define DBGDRAW}
 
 interface
 
@@ -219,6 +251,8 @@ type
       FPixelePerMinorScale: integer;
       FGridTextHeight: integer;
       FColor: TColor;
+      FFreeColor: TColor;
+      FExpiredColor: TColor;
       //scrollbars
       FHScrollPosition: integer;
       FVSbVisible: boolean;
@@ -279,6 +313,8 @@ type
       FEndDate: TDate;
       FFactIntervalColor: TColor;
       FPlanIntervalColor: TColor;
+      FFreeIntervalColor: TColor;
+      FExpiredIntervalColor: TColor;
       FStartDate: TDate;
       FvpGanttOptions: TvpGanttOptions;
       FvpGanttTasks: TvpGanttTasks;
@@ -329,8 +365,10 @@ type
       procedure OnTitleFontChanged(Sender: TObject);
       function OptionsIsStored: Boolean;
       procedure SetEndDate(AValue: TDate);
+      procedure SetExpiredIntervalColor(AValue: TColor);
       procedure SetFactIntervalColor(AValue: TColor);
       procedure SetFocusColor(AValue: TColor);
+      procedure SetFreeIntervalColor(AValue: TColor);
       procedure SetMajorScale(AValue: TvpTimeScale);
       procedure SetMajorScaleHeight(AValue: integer);
       procedure SetMinorScale(AValue: TvpTimeScale);
@@ -441,6 +479,8 @@ type
       property CalendarColor:TColor read GetCalendarColor write SetCalendarColor default clWindow;
       property PlanIntervalColor: TColor read FPlanIntervalColor write SetPlanIntervalColor default clSkyBlue;
       property FactIntervalColor: TColor read FFactIntervalColor write SetFactIntervalColor default clBlue;
+      property FreeIntervalColor: TColor read FFreeIntervalColor write SetFreeIntervalColor default clLime;
+      property ExpiredIntervalColor: TColor read FExpiredIntervalColor write SetExpiredIntervalColor default clRed;
   end;
 
   //draw
@@ -929,8 +969,13 @@ begin
   {$endif}
   FPlanRect.Top := ATop;
   FPlanRect.Bottom := ABottom;
-  FFactRect.Top := Top;
-  FFactRect.Bottom := Bottom;
+  //отсекаем лишнее по высоте
+  InflateRect(FPlanRect, 0, -C_DEF_INTERVAL_PADDING);
+  //чтобы не было обратной области
+  FPlanRect.Bottom := Max(FPlanRect.Top, FPlanRect.Bottom);
+  //применяем координаты высоты и для фактической области
+  FFactRect.Top := FPlanRect.Top;
+  FFactRect.Bottom := FPlanRect.Bottom;
 end;
 
 procedure TvpInterval.SetFinishDate(AValue: TDateTime);
@@ -1796,23 +1841,18 @@ end;
 
 procedure TvpGanttCalendar.DrawInterval(const aRow: integer);
 var
-  drawRect, planRect, factRect: TRect;
+  drawRect, expRect: TRect;
   curInterval: TvpInterval;
-  lineOffset: integer;
-  ffColor: TColor;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawRow');
   {$endif}
   curInterval := FvpGantt.Interval[aRow];
-  OffsetRect(curInterval.FPlanRect, FHScrollPosition, 0);
-  OffsetRect(curInterval.FFactRect, FHScrollPosition, 0);
-  //если строка смещена по скроллингу, то начало будет в "-"
-  drawRect.Left := planRect.Left - FHScrollPosition;
-  drawRect.Top := aRect.Top + C_DEF_INTERVAL_PADDING;
-  drawRect.Bottom := aRect.Bottom - C_DEF_INTERVAL_PADDING;
-  //чтобы не было обратной области
-  drawRect.Bottom := Max(drawRect.Top, drawRect.Bottom);
+  //смещаем скролл
+  drawRect := TRect.Create(curInterval.FPlanRect);
+  OffsetRect(drawRect, -FHScrollPosition, 0);
+  expRect := TRect.Create(curInterval.FFactRect);
+  OffsetRect(expRect, -FHScrollPosition, 0);
   //кисть и перо
   Canvas.Brush.Style := bsSolid;
   Canvas.Brush.Color := FvpGantt.PlanIntervalColor;
@@ -1821,33 +1861,28 @@ begin
   //проверяем на завершение
   if curInterval.FFinishDate>0 then
     begin
+      Canvas.Brush.Color := FvpGantt.FactIntervalColor;
+      Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
+      //если интервал вышел за пределы
       if curInterval.IsExpired then
         begin
-          drawRect.Right := drawRect.Left + factRect.Width;
-          lineOffset := drawRect.Left + planRect.Width;
-          ffColor := clRed;
+          Canvas.Brush.Color := FvpGantt.ExpiredIntervalColor;
+          //сдвигаем на 1 чтобы нормально отрисовалась общая область
+          expRect.Left := drawRect.Right-1;
+          Canvas.RoundRect(expRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
         end
       else
         begin
-          drawRect.Right := drawRect.Left + planRect.Width;
-          lineOffset := drawRect.Left + factRect.Width;
-          ffColor := clGreen;
+          Canvas.Brush.Color := FvpGantt.FreeIntervalColor;
+          expRect.Left := expRect.Right;
+          expRect.Right := drawRect.Right;
+          Canvas.RoundRect(expRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
         end;
-      //рисуем область
-      Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
-      //заливка выполненной области
-      Canvas.Brush.Color := ffColor;
-      drawRect.Left := lineOffset;
-      Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
-      Canvas.MoveTo(lineOffset, drawRect.Top);
-      Canvas.LineTo(lineOffset, drawRect.Bottom);
+      Canvas.MoveTo(expRect.Left, expRect.Top);
+      Canvas.LineTo(expRect.Left, expRect.Bottom);
     end
   else
-    begin
-      drawRect.Right := drawRect.Left + planRect.Width;
-      //рисуем область
-      Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
-    end;
+    Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
 end;
 
 { Процедура прорисовки строки.
@@ -2076,6 +2111,10 @@ begin
   FMajorScale := vptsMonth;
   FMinorScale := vptsDay;
   FPixelePerMinorScale := C_DEF_PIXEL_PER_MINOR;
+
+  //цвета
+  FFreeColor := clLime;
+  FExpiredColor := clRed;
 end;
 
 destructor TvpGanttCalendar.Destroy;
@@ -2786,6 +2825,17 @@ begin
     end;
 end;
 
+procedure TvpGantt.SetExpiredIntervalColor(AValue: TColor);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.SetExpiredIntervalColor');
+  {$endif}
+  if FExpiredIntervalColor = AValue then
+    Exit;
+  FExpiredIntervalColor := AValue;
+  VisualChange;
+end;
+
 procedure TvpGantt.SetFactIntervalColor(AValue: TColor);
 begin
   {$ifdef DBGGANTT}
@@ -2794,6 +2844,7 @@ begin
   if FFactIntervalColor = AValue then
     Exit;
   FFactIntervalColor := AValue;
+  VisualChange;
 end;
 
 procedure TvpGantt.SetFocusColor(AValue: TColor);
@@ -2806,6 +2857,17 @@ begin
   FFocusColor := AValue;
   //DONE Сделать обновление области с фокусом
   InvalidateFocused;
+end;
+
+procedure TvpGantt.SetFreeIntervalColor(AValue: TColor);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.SetFreeIntervalColor');
+  {$endif}
+  if FFreeIntervalColor = AValue then
+    Exit;
+  FFreeIntervalColor := AValue;
+  VisualChange;
 end;
 
 procedure TvpGantt.SetMajorScale(AValue: TvpTimeScale);
@@ -2895,8 +2957,10 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetPlanIntervalColor');
   {$endif}
-  if FPlanIntervalColor = AValue then Exit;
+  if FPlanIntervalColor = AValue then
+    Exit;
   FPlanIntervalColor := AValue;
+  VisualChange;
 end;
 
 procedure TvpGantt.SetRowHeight(AValue: integer);
@@ -3625,6 +3689,8 @@ begin
 
   FPlanIntervalColor := clSkyBlue;
   FFactIntervalColor := clBlue;
+  FFreeIntervalColor := clLime;
+  FExpiredIntervalColor := clRed;
 
   RowHeight := C_DEF_ROW_HEIGHT;
   MajorScaleHeight := C_DEF_ROW_HEIGHT;
