@@ -129,6 +129,7 @@ type
       procedure SetDuration(AValue: Double);
       procedure SetFinishDate(AValue: TDateTime);
       procedure SetStartDate(AValue: TDateTime);
+      procedure SetBoundHeight(const ATop, ABottom: integer);
     protected
       procedure CalcPlanBound;
       procedure CalcFactBound;
@@ -137,6 +138,7 @@ type
       destructor Destroy; override;
 
       procedure DoDraw(ACanvas: TCanvas; const aRect: TRect; aDX: integer);
+      function IsExpired: boolean;
       procedure UpdateBounds;
     published
       property StartDate: TDateTime read FStartDate write SetStartDate;
@@ -246,7 +248,7 @@ type
       procedure DrawEdges;
       procedure DrawMajorScale;
       procedure DrawMinorScale;
-      procedure DrawInterval(const aRow: integer; aRect: TRect);
+      procedure DrawInterval(const aRow: integer);
       procedure DrawRow(const aRow: integer);
       procedure DrawRows;
       procedure GetSBVisibility(out HsbVisible,VsbVisible:boolean);
@@ -920,6 +922,17 @@ begin
   CalcPlanBound;
 end;
 
+procedure TvpInterval.SetBoundHeight(const ATop, ABottom: integer);
+begin
+  {$ifdef DBGINTERVAL}
+  Form1.Debug('TvpInterval.SetFinishDate');
+  {$endif}
+  FPlanRect.Top := ATop;
+  FPlanRect.Bottom := ABottom;
+  FFactRect.Top := Top;
+  FFactRect.Bottom := Bottom;
+end;
+
 procedure TvpInterval.SetFinishDate(AValue: TDateTime);
 begin
   {$ifdef DBGINTERVAL}
@@ -1068,6 +1081,14 @@ begin
     oldBrush.Free;
     oldPen.Free;
   end;
+end;
+
+function TvpInterval.IsExpired: boolean;
+begin
+  {$ifdef DBGINTERVAL}
+  Form1.Debug('TvpInterval.IsExpired');
+  {$endif}
+  Result := FFinishDate > (FStartDate + FDuration);
 end;
 
 { Процедура пересчета границ интервала. Если сделаны изменения шкал, дат и кол-ва интервало
@@ -1773,29 +1794,60 @@ begin
     end;
 end;
 
-procedure TvpGanttCalendar.DrawInterval(const aRow: integer; aRect: TRect);
+procedure TvpGanttCalendar.DrawInterval(const aRow: integer);
 var
   drawRect, planRect, factRect: TRect;
+  curInterval: TvpInterval;
+  lineOffset: integer;
+  ffColor: TColor;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DrawRow');
   {$endif}
-  planRect := FvpGantt.Interval[aRow].FPlanRect;
-  factRect := FvpGantt.Interval[aRow].FFactRect;
+  curInterval := FvpGantt.Interval[aRow];
+  OffsetRect(curInterval.FPlanRect, FHScrollPosition, 0);
+  OffsetRect(curInterval.FFactRect, FHScrollPosition, 0);
   //если строка смещена по скроллингу, то начало будет в "-"
   drawRect.Left := planRect.Left - FHScrollPosition;
   drawRect.Top := aRect.Top + C_DEF_INTERVAL_PADDING;
-  drawRect.Right := drawRect.Left + planRect.Width;
   drawRect.Bottom := aRect.Bottom - C_DEF_INTERVAL_PADDING;
+  //чтобы не было обратной области
+  drawRect.Bottom := Max(drawRect.Top, drawRect.Bottom);
   //кисть и перо
   Canvas.Brush.Style := bsSolid;
   Canvas.Brush.Color := FvpGantt.PlanIntervalColor;
   Canvas.Pen.Style := psSolid;
-  Canvas.Pen.Color := cl3DShadow;
-  //рисуем
-  Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
-  Canvas.MoveTo(drawRect.Left + factRect.Width, drawRect.Top);
-  Canvas.LineTo(drawRect.Left + factRect.Width, drawRect.Bottom);
+  Canvas.Pen.Color := cl3DDkShadow;
+  //проверяем на завершение
+  if curInterval.FFinishDate>0 then
+    begin
+      if curInterval.IsExpired then
+        begin
+          drawRect.Right := drawRect.Left + factRect.Width;
+          lineOffset := drawRect.Left + planRect.Width;
+          ffColor := clRed;
+        end
+      else
+        begin
+          drawRect.Right := drawRect.Left + planRect.Width;
+          lineOffset := drawRect.Left + factRect.Width;
+          ffColor := clGreen;
+        end;
+      //рисуем область
+      Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
+      //заливка выполненной области
+      Canvas.Brush.Color := ffColor;
+      drawRect.Left := lineOffset;
+      Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
+      Canvas.MoveTo(lineOffset, drawRect.Top);
+      Canvas.LineTo(lineOffset, drawRect.Bottom);
+    end
+  else
+    begin
+      drawRect.Right := drawRect.Left + planRect.Width;
+      //рисуем область
+      Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
+    end;
 end;
 
 { Процедура прорисовки строки.
@@ -1896,7 +1948,8 @@ begin
                     end;
                 end;
               //рисуем интервал
-              DrawInterval(aRow, cellRect);
+              FvpGantt.Interval[aRow].SetBoundHeight(cellRect.Top, cellRect.Bottom);
+              DrawInterval(aRow);
             end;
         end;
     end;

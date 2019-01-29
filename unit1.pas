@@ -56,13 +56,11 @@ implementation
 procedure TForm1.Button1Click(Sender: TObject);
 begin
   Debug('TForm1.Button1Click');
-
-  Panel4.Canvas.Pen.Width := 4;
-  Panel4.Canvas.Pen.Color := clLime;
-  PAnel4.Canvas.Line(0,2, Panel4.ClientWidth, 2);
-  Panel4.Canvas.Pen.Width := 1;
-  Panel4.Canvas.Pen.Color := clREd;
-  PAnel4.Canvas.Line(0,2, Panel4.ClientWidth, 2);
+  Panel4.Canvas.Brush.Color := clGreen;
+  Panel4.Canvas.pen.Color := clBlack;
+  Panel4.Canvas.Rectangle(0,0,25,25);
+  Panel4.Canvas.Brush.Color := clRed;
+  PAnel4.Canvas.FloodFill(1,1, clGreen, fsSurface);
   //Panel4.Canvas.Rectangle(0,0, 10,10);
   //Panel4.Canvas.Rectangle(10,10, Panel4.ClientWidth, Panel4.ClientHeight);
   Memo1.Lines.Add('Panel4.ClientWidth ' + IntToStr(Panel4.ClientWidth));
@@ -126,7 +124,10 @@ begin
       GInterval.Name := IntToStr(i) + '  123456789abcdefghijklmnopqrstuvwxyz' ;
       GInterval.StartDate := Now + i;
       GInterval.Duration := 10;
-      //GInterval.FinishDate := Now + i + 12;
+      if i = 6 then
+        GInterval.FinishDate := Now + i + 4;
+      if i = 8 then
+        GInterval.FinishDate := Now + i + 24;
       //GInterval.Visible := True;
       GanttDiagram.AddInterval(GInterval);
     end;
