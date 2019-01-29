@@ -15,6 +15,8 @@ type
 
   TForm1 = class(TForm)
     Button1: TButton;
+    Button2: TButton;
+    Button3: TButton;
     ChBStyle: TCheckBox;
     ChBFlat: TCheckBox;
     EL: TEventLog;
@@ -28,6 +30,8 @@ type
     Splitter1: TSplitter;
     StringGrid1: TStringGrid;
     procedure Button1Click(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
+    procedure Button3Click(Sender: TObject);
     procedure ChBFlatChange(Sender: TObject);
     procedure ChBStyleChange(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
@@ -77,6 +81,35 @@ begin
 
 end;
 
+procedure TForm1.Button2Click(Sender: TObject);
+var
+  i: integer;
+  //LInterval: TInterval;
+  GInterval: TvpInterval;
+begin
+  GanttDiagram.BeginUpdate;
+  for i:=0 to 16 do
+    begin
+      GInterval := TvpInterval.Create(GanttDiagram);
+      GInterval.Name := IntToStr(i) + '  123456789abcdefghijklmnopqrstuvwxyz' ;
+      GInterval.StartDate := Now + i;
+      GInterval.Duration := 10;
+      if i = 6 then
+        GInterval.FinishDate := Now + i + 4;
+      if i = 8 then
+        GInterval.FinishDate := Now + i + 10;
+      //GInterval.Visible := True;
+      GanttDiagram.AddInterval(GInterval);
+    end;
+  GanttDiagram.First;
+  GanttDiagram.EndUpdate();
+end;
+
+procedure TForm1.Button3Click(Sender: TObject);
+begin
+  GanttDiagram.Clear;
+end;
+
 procedure TForm1.ChBFlatChange(Sender: TObject);
 begin
   Debug('TForm1.ChBFlatChange');
@@ -101,10 +134,6 @@ begin
 end;
 
 procedure TForm1.FormShow(Sender: TObject);
-var
-  i: integer;
-  //LInterval: TInterval;
-  GInterval: TvpInterval;
 begin
   EL.Active := True;
 
@@ -116,22 +145,8 @@ begin
   GanttDiagram.TaskTitleCaption := 'Проекты';
   GanttDiagram.MajorScale := vptsMonth;
   GanttDiagram.MinorScale := vptsDay;
-  GanttDiagram.TitleStyle := tsStandard;
+  GanttDiagram.TitleStyle := tsNative;
   //Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
-  for i:=0 to 25 do
-    begin
-      GInterval := TvpInterval.Create(GanttDiagram);
-      GInterval.Name := IntToStr(i) + '  123456789abcdefghijklmnopqrstuvwxyz' ;
-      GInterval.StartDate := Now + i;
-      GInterval.Duration := 10;
-      if i = 6 then
-        GInterval.FinishDate := Now + i + 4;
-      if i = 8 then
-        GInterval.FinishDate := Now + i + 24;
-      //GInterval.Visible := True;
-      GanttDiagram.AddInterval(GInterval);
-    end;
-  GanttDiagram.First;
   //GanttDiagram.Scale := vptsYear;
   GanttDiagram.SetFocus;
 

@@ -28,14 +28,13 @@
 }
 
 
-{
-  TODO: -o Vas :
-  1. Поравить отрисовку бордера в гриде, рисоват надо внутри ячейки
-  2. Интервалы сделать как коллекцию. С возможностью задания для каждого интервала своих свойств
-  3. Подумать о группах.
-  4. ЕСли будут группы, то тогда можно UpdateDates делать по группам, а в группах обновлять максимальную и минимальные даты
+{ TODO -o Vas:
+  1. Интервалы сделать как коллекцию. С возможностью задания для каждого интервала своих свойств
+  2. Подумать о группах.
+  3. ЕСли будут группы, то тогда можно UpdateDates делать по группам, а в группах обновлять максимальную и минимальные даты
      при добавлении интервалов.
-  5. Clear для очистки всех интервалов
+  4. Clear для очистки всех интервалов
+  5. Сделать сортировку по датам
 }
 
 
@@ -124,6 +123,8 @@ resourcestring
   RS_E_MINORSCALE_HIGH = 'MinorScale should by lower than MajorScale';
   RS_E_MINORSCALE_EQUAL = 'MinorScale should by different from MajorScale';
   RS_E_LIST_INDEX_OUT_OF_BOUNDS = 'List index out of bounds';
+  RS_E_FINISHDATE_LESS = 'Finish date should by higher than start date of the interval';
+  RS_E_STARTDATE_HIGH = 'Start date shoul be lower than finish date of the interval';
   //date
   RS_HOUR = 'ч.';
   RS_WEEK = 'Нед. ';
@@ -169,7 +170,6 @@ type
       constructor Create(AvpGantt: TvpGantt); virtual;
       destructor Destroy; override;
 
-      procedure DoDraw(ACanvas: TCanvas; const aRect: TRect; aDX: integer);
       function IsExpired: boolean;
       procedure UpdateBounds;
     published
@@ -435,6 +435,7 @@ type
       procedure DeleteInterval(AnIndex: Integer);
       procedure RemoveInterval(AnInterval: TvpInterval);
       procedure UpdateInterval(AnIndex: Integer = -1);
+      procedure Clear;
 
       function GetStartDateOfBound: TDateTime;
       function GetEndDateOfBound: TDateTime;
@@ -957,6 +958,8 @@ begin
   Form1.Debug('TvpInterval.SetStartDate');
   {$endif}
   if FStartDate = AValue then Exit;
+  if (FFinishDate<>0) AND (AValue>FFinishDate) then
+    Raise Exception.Create(RS_E_STARTDATE_HIGH);
   FStartDate := AValue;
   //расчитываем области
   CalcPlanBound;
@@ -985,6 +988,8 @@ begin
   {$endif}
   if FFinishDate = AValue then
     Exit;
+  if AValue<FStartDate then
+    Raise Exception.Create(RS_E_FINISHDATE_LESS);
   FFinishDate := AValue;
   //расчитываем области
   CalcFactBound;
@@ -1086,46 +1091,6 @@ begin
   Form1.Debug('TvpInterval.Destroy');
   {$endif}
   inherited Destroy;
-end;
-
-{TODO -o Vas: Не должны мы знать как рисоваться, пусть календарь сам и рисует ему виднее,
-мы ему только размер свой отдадим и все }
-procedure TvpInterval.DoDraw(ACanvas: TCanvas; const aRect: TRect; aDX: integer);
-var
-  drawRect: TRect;
-  oldBrush: TBrush;
-  oldPen: TPen;
-begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.DoDraw');
-  {$endif}
-  oldBrush := TBrush.Create;
-  oldPen := TPen.Create;
-  try
-    with ACanvas do
-      begin
-        //если строка смещена по скроллингу, то начало будет в "-"
-        drawRect.Left := FPlanRect.Left - aDX;
-        drawRect.Top := aRect.Top + C_DEF_INTERVAL_PADDING;
-        drawRect.Right := drawRect.Left + FPlanRect.Width;
-        drawRect.Bottom := aRect.Bottom - C_DEF_INTERVAL_PADDING;
-        //кисть и перо
-        oldBrush.Assign(Brush);
-        oldPen.Assign(Pen);
-        //рисуем
-        Brush.Style := bsSolid;
-        Brush.Color := FvpGantt.PlanIntervalColor;
-        Pen.Style := psSolid;
-        Pen.Color := cl3DDkShadow;
-        RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
-        //восстанавливаем кисть и перо
-        Brush.Assign(oldBrush);
-        Pen.Assign(oldPen);
-      end;
-  finally
-    oldBrush.Free;
-    oldPen.Free;
-  end;
 end;
 
 function TvpInterval.IsExpired: boolean;
@@ -3270,26 +3235,28 @@ end;
 
 procedure TvpGantt.UpdateSizes;
 var
-  aDiff: integer;
+  heightWithHScrollBar, visHeight: integer;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.UpdateSizes');
   {$endif}
   CalcIntervalsHeight;
-  FScrollBarWidth  := GetSystemMetrics(SM_CXVSCROLL) +
-                       GetSystemMetrics(SM_SWSCROLLBARSPACING);
-  FScrollBarHeight := GetSystemMetrics(SM_CYHSCROLL) +
-                       GetSystemMetrics(SM_SWSCROLLBARSPACING);
-//считаем сдвиг по вертикали
-  {TODO: -o Vas Надо как-то посчитать сдвиг по вертикали }
-  //if FIntervalsHeight-FVScrollPosition<ClientHeight-GetTitleHeight then
-  //  begin
-  //    //находим разницу межку клинетской выстой и высотой всех строк - сдвиг
-  //    aDiff := ClientHeight - GetTitleHeight - (FIntervalsHeight - FVScrollPosition);
-  //    aDiff := Max(0, aDiff);
-  //    if FvpGanttCalendar.HandleAllocated then
-  //      SendMessage(FvpGanttCalendar.Handle, LM_VSCROLL, MakeWParam(SB_THUMBPOSITION, FVScrollPosition-aDiff),0);
-  //  end;
+  //считаем сдвиг по вертикали
+  {DONE: -o Vas Надо как-то посчитать сдвиг по вертикали }
+  if FvpGanttTasks.HandleAllocated AND FvpGanttCalendar.HandleAllocated then
+    begin
+      visHeight := FIntervalsHeight + GetTitleHeight - FVScrollPosition;
+      if (FvpGanttTasks.FHSbVisible) OR (FvpGanttCalendar.FHSbVisible) then
+        heightWithHScrollBar := ClientHeight - FScrollBarHeight
+      else
+        heightWithHScrollBar := ClientHeight;
+      if (visHeight<heightWithHScrollBar) then
+        begin
+          FVScrollPosition := FVScrollPosition - (heightWithHScrollBar - visHeight);
+          FVScrollPosition := max(0, FVScrollPosition);
+          SendMessage(FvpGanttCalendar.Handle, LM_VSCROLL, MakeWParam(SB_THUMBPOSITION, FVScrollPosition),0);
+        end;
+    end;
 end;
 
 procedure TvpGantt.WMSize(var message: TLMSize);
@@ -3714,6 +3681,10 @@ begin
     end;
 
   FVScrollPosition := 0;
+  FScrollBarWidth  := GetSystemMetrics(SM_CXVSCROLL) +
+                      GetSystemMetrics(SM_SWSCROLLBARSPACING);
+  FScrollBarHeight := GetSystemMetrics(SM_CYHSCROLL) +
+                      GetSystemMetrics(SM_SWSCROLLBARSPACING);
 
   FFocusRow := -1;
   FFocusColor := clBlack;
@@ -3810,6 +3781,23 @@ begin
     UpdateBoundDates(TvpInterval(FIntervals[AnIndex]).StartDate,
                         TvpInterval(FIntervals[AnIndex]).FinishDate);
   VisualChange;
+end;
+
+procedure TvpGantt.Clear;
+var
+  i:integer;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.Clear');
+  {$endif}
+  BeginUpdate;
+  for i:=0 to IntervalCount-1 do
+    TvpInterval(FIntervals[i]).Free;
+  FIntervals.Clear;
+  FStartDateOfBound := 0;
+  FEndDateOfBound := 0;
+  UpdateBoundDates(FStartDate, FEndDate);
+  EndUpdate();
 end;
 
 procedure TvpGantt.BeginUpdate;
@@ -4028,18 +4016,20 @@ procedure TvpGantt.DrawTitleText(ACanvas: TCanvas; const aRect: TRect; aText: st
 var
   aTextStyle: TTextStyle;
   textRect: TRect;
+  aBrushStyle: TBrushStyle;
 begin
   {TODO: -o Vas Попробовать сделать для первого диапазона не прокручивающуюся надпись  }
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.DrawTitleText');
   {$endif}
   //рисуем названия
-  //SetBkMode(ACanvas.Handle, TRANSPARENT);
-  //DrawText(ACanvas.Handle, PChar(aText), Length(aText), aRect, DT_CENTER OR DT_SINGLELINE OR DT_VCENTER);
+  aBrushStyle := ACanvas.Brush.Style;
+  ACanvas.Brush.Style := bsClear;
   aTextStyle := FTitleTextStyle;
   aTextStyle.Alignment := aAligment;
   textRect := Rect(aRect.Left + C_TITLE_TEXT_INDENT, aRect.Top, aRect.Right - C_TITLE_TEXT_INDENT, aRect.Bottom);
   ACanvas.TextRect(textRect, textRect.Left, textRect.Top, aText, aTextStyle);
+  ACanvas.Brush.Style := aBrushStyle;
 end;
 
 
