@@ -88,16 +88,20 @@ var
   GInterval: TvpInterval;
 begin
   GanttDiagram.BeginUpdate;
-  for i:=0 to 16 do
+  for i:=0 to 5 do
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
       GInterval.Name := IntToStr(i) + '  123456789abcdefghijklmnopqrstuvwxyz' ;
-      GInterval.StartDate := Now + i;
+      GInterval.StartDate := Now - 4 + i;
       GInterval.Duration := 10;
+      if i = 4 then
+        GInterval.FinishDate := GInterval.StartDate + 4;
       if i = 6 then
-        GInterval.FinishDate := Now + i + 4;
+        GInterval.FinishDate := GInterval.StartDate + 9;
       if i = 8 then
-        GInterval.FinishDate := Now + i + 10;
+        GInterval.FinishDate := GInterval.StartDate + 10;
+      if i = 10 then
+        GInterval.FinishDate := GInterval.StartDate + 11;
       //GInterval.Visible := True;
       GanttDiagram.AddInterval(GInterval);
     end;
@@ -146,8 +150,8 @@ begin
   GanttDiagram.MajorScale := vptsMonth;
   GanttDiagram.MinorScale := vptsDay;
   GanttDiagram.TitleStyle := tsNative;
+  GanttDiagram.GanttBorderWidth := 1;
   //Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
-  //GanttDiagram.Scale := vptsYear;
   GanttDiagram.SetFocus;
 
   //GC :=  TgsGantt.Create(Self);

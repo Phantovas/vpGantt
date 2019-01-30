@@ -15,7 +15,7 @@
 @Author:: Vasiliy Ponomarjov
 @Email: phantovas@gmail.com
 @created: 06-JAN-2019
-@modified: 29-JAN-2019
+@modified: 30-JAN-2019
 @version: 0.3a
 
 /******************************************************************************/
@@ -33,8 +33,7 @@
   2. Подумать о группах.
   3. ЕСли будут группы, то тогда можно UpdateDates делать по группам, а в группах обновлять максимальную и минимальные даты
      при добавлении интервалов.
-  4. Clear для очистки всех интервалов
-  5. Сделать сортировку по датам
+  4. Сделать сортировку по датам
 }
 
 
@@ -80,7 +79,8 @@ type
                 vpgRowHighlight,              //рисовать подсветку всей строки
                 vpgMoveFocusToNewInterval,    //перемещать фокус на добавленную строку
                 vpgVertLine,                  //вертикальный бордюр в сетке
-                vpgHorzLine                   //горизонтальный бордюр в сетке
+                vpgHorzLine,                  //горизонтальный бордюр в сетке
+                vpgExtendVertLines            //вертикальные разделители в высоту компонента
                 );
 
   TvpGanttOptions = set of TvpgOption;
@@ -113,7 +113,13 @@ type
 const
   constCellPadding: byte = 3;
   constRubberSpace: byte = 2;
-  DefaultGanttOptions = [vpgDrawFocusSelected, vpgFocusHighlight, vpgMajorVertLine, vpgRowHighlight, vpgHorzLine, vpgVertLine];
+  DefaultGanttOptions = [vpgDrawFocusSelected,
+                         vpgFocusHighlight,
+                         vpgMajorVertLine,
+                         vpgRowHighlight,
+                         vpgHorzLine,
+                         vpgVertLine
+                        ];
 
 resourcestring
   RS_TITLE_TASKS = 'Задача';
@@ -285,6 +291,7 @@ type
       procedure DrawInterval(const aRow: integer);
       procedure DrawRow(const aRow: integer);
       procedure DrawRows;
+      procedure DrawScaleVertLines(const X: integer);
       procedure GetSBVisibility(out HsbVisible,VsbVisible:boolean);
       procedure GetSBRanges(const HsbVisible,VsbVisible: boolean;
                     out HsbRange,VsbRange,HsbPage,VsbPage,HsbPos,VsbPos:Integer);
@@ -1770,6 +1777,10 @@ begin
           FvpGantt.DrawTitleCell(Canvas, aRect);
           FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taLeftJustify);
         end;
+      //рисуем вертикальные разделители времени только если не рисовать от минорной области
+      if not (vpgMinorVertLine in FvpGantt.Options) AND
+             (vpgMajorVertLine in FvpGantt.Options) then
+        DrawScaleVertLines(aRect.Right-1);
       //сдвигаем область на начало следующего диапазона
       aRect.Offset(aRect.Width, 0);
     end;
@@ -1799,6 +1810,9 @@ begin
           FvpGantt.DrawTitleCell(Canvas, aRect);
           FvpGantt.DrawTitleText(Canvas, aRect, aScaleName, taCenter);
         end;
+      //рисуем вертикальные разделители времени
+      if vpgMinorVertLine in FvpGantt.Options then
+        DrawScaleVertLines(aRect.Right-1);
       //сдвигаем область на начало следующего диапазона
       aRect.Offset(aRect.Width, 0);
     end;
@@ -1810,7 +1824,7 @@ var
   curInterval: TvpInterval;
 begin
   {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.DrawRow');
+  Form1.Debug('TvpGanttCalendar.DrawInterval');
   {$endif}
   curInterval := FvpGantt.Interval[aRow];
   //смещаем скролл
@@ -1826,6 +1840,7 @@ begin
   //проверяем на завершение
   if curInterval.FFinishDate>0 then
     begin
+      //рисуем основную заливку
       Canvas.Brush.Color := FvpGantt.FactIntervalColor;
       Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
       //если интервал вышел за пределы
@@ -1834,17 +1849,21 @@ begin
           Canvas.Brush.Color := FvpGantt.ExpiredIntervalColor;
           //сдвигаем на 1 чтобы нормально отрисовалась общая область
           expRect.Left := drawRect.Right-1;
-          Canvas.RoundRect(expRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
         end
       else
         begin
           Canvas.Brush.Color := FvpGantt.FreeIntervalColor;
-          expRect.Left := expRect.Right;
+          expRect.Left := expRect.Right-1;
           expRect.Right := drawRect.Right;
-          Canvas.RoundRect(expRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
         end;
-      Canvas.MoveTo(expRect.Left, expRect.Top);
-      Canvas.LineTo(expRect.Left, expRect.Bottom);
+      //рисуем область первышение или свободного времени,
+      //только если ширина расширенной части > 2 пикселей, иначе нарисуется только обводка
+      if expRect.Width>2 then
+        begin
+          Canvas.RoundRect(expRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
+          Canvas.MoveTo(expRect.Left, expRect.Top);
+          Canvas.LineTo(expRect.Left, expRect.Bottom);
+        end;
     end
   else
     Canvas.RoundRect(drawRect, C_DEF_INTERVAL_RADIUS, C_DEF_INTERVAL_RADIUS);
@@ -1872,9 +1891,6 @@ begin
   {$endif}
   if not Assigned(FvpGantt) then
     Exit;
-  //опции
-  prevMinorInMajor := 0;
-  NeedDrawMajorBorder := false;
   //область строки
   rowRect := CalcRowRect(aRow);
   aMinorScaleWidth := GetMinorScaleWidth;
@@ -1894,18 +1910,6 @@ begin
       //нужно нарисовать строку по ячейкам старшей или младшей шкалы
       for i:=0 to FMinorScaleCount - 1 do
         begin
-          //ищем текущую мажорную шкалу
-          if (i+1) mod (prevMinorInMajor + FMinorCountInMajor[j])=0 then
-            begin
-              //запоминаем сколько в ней было минорных диапазонов
-              prevMinorInMajor := FMinorCountInMajor[j];
-              //переходим к значениям следующей шкалы
-              inc(j);
-              //разрешаем рисовать вертикальную полосу
-              NeedDrawMajorBorder := true;
-            end
-          else
-            NeedDrawMajorBorder := false;
           //устанавливаем размер области = размеру области строки
           cellRect := rowRect;
           //вычисляем с учетом сдвига, ширина будет равна FPixelePerMinorScale;
@@ -1929,24 +1933,6 @@ begin
               //нижний бордюр срезаем всегда (ну в зависимости от установленного флага)
               FvpGantt.CutHBorderFromRect(cellRect);
               FvpGantt.DrawCell(aRow, Canvas, cellRect);
-              if Dv then
-                begin
-                  if vpgMinorVertLine in FvpGantt.Options then
-                    begin
-                      Canvas.Pen.Style := psDot;
-                      Canvas.Pen.Color := FvpGantt.BorderColor;
-                      Canvas.Line(cellRect.Right-1, cellRect.Top, cellRect.Right-1, cellRect.Bottom);
-                    end
-                  else if vpgMajorVertLine in FvpGantt.Options then
-                    begin
-                      if NeedDrawMajorBorder then
-                        begin
-                          Canvas.Pen.Style := psDot;
-                          Canvas.Pen.Color := FvpGantt.BorderColor;
-                          Canvas.Line(cellRect.Right-1, cellRect.Top, cellRect.Right-1, cellRect.Bottom);
-                        end;
-                    end;
-                end;
               //рисуем интервал
               FvpGantt.Interval[aRow].SetBoundHeight(cellRect.Top, cellRect.Bottom);
               DrawInterval(aRow);
@@ -1964,6 +1950,22 @@ begin
   {$endif}
   for i:=0 to FvpGantt.IntervalCount-1 do
     DrawRow(i);
+end;
+
+procedure TvpGanttCalendar.DrawScaleVertLines(const X: integer);
+begin
+  //рисуем вертикальные разделители времени
+  if vpgVertLine in FvpGantt.Options then
+    begin
+      Canvas.Brush.Style := bsClear;
+      Canvas.Pen.Style := psDot;
+      Canvas.Pen.Color := FvpGantt.BorderColor;
+      //рисуем до конца видимой части компонента или до конца списка
+      if vpgExtendVertLines in FvpGantt.Options then
+        Canvas.Line(X, FvpGantt.GetTitleHeight, X, ClientRect.Bottom)
+      else
+        Canvas.Line(X, FvpGantt.GetTitleHeight, X, FCalendarHeight);
+    end;
 end;
 
 procedure TvpGanttCalendar.GetSBVisibility(out HsbVisible, VsbVisible: boolean);
@@ -2058,9 +2060,9 @@ begin
   Form1.Debug('TvpGanttCalendar.Paint');
   {$endif}
   ClearCanvas;
+  DrawRows;
   DrawMajorScale;
   DrawMinorScale;
-  DrawRows;
   DrawEdges;
 end;
 
@@ -2436,8 +2438,8 @@ begin
   Form1.Debug('TvpGanttTasks.Paint');
   {$endif}
   ClearCanvas;
-  DrawTitle;
   DrawRows;
+  DrawTitle;
   DrawEdges;
 end;
 
@@ -3242,7 +3244,6 @@ begin
   {$endif}
   CalcIntervalsHeight;
   //считаем сдвиг по вертикали
-  {DONE: -o Vas Надо как-то посчитать сдвиг по вертикали }
   if FvpGanttTasks.HandleAllocated AND FvpGanttCalendar.HandleAllocated then
     begin
       visHeight := FIntervalsHeight + GetTitleHeight - FVScrollPosition;
@@ -3797,6 +3798,9 @@ begin
   FStartDateOfBound := 0;
   FEndDateOfBound := 0;
   UpdateBoundDates(FStartDate, FEndDate);
+  {TODO -o Vas: Подумать о сбросе горизонтального скроллинга в календаре}
+  //if FvpGanttCalendar.HandleAllocated then
+  //  FvpGanttCalendar.FHScrollPosition := 0;
   EndUpdate();
 end;
 
