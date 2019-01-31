@@ -1189,7 +1189,7 @@ begin
   //то прокручиваем на ширину строки
   if FvpGantt.FFocusRect.Bottom>ClientRect.Bottom then
     begin
-      curPos := curPos + FvpGantt.RowHeight;
+      curPos := curPos + FvpGantt.FFocusRect.Bottom - ClientRect.Bottom;
       //не должно быть > максимальногго диспазона прокрутки диапазон скрола - высота страницы скрола - 1
       curPos := Min(curPos, FCalendarHeight - ClientHeight);
     end
@@ -1197,7 +1197,7 @@ begin
   //то прокручиваем ширину строки
   else if FvpGantt.FFocusRect.Top<FGridVisibleRect.Top then
     begin
-      curPos := curPos - FvpGantt.RowHeight;
+      curPos := curPos + FvpGantt.FFocusRect.Top - FGridVisibleRect.Top;
       //не должно быть отрицательным, т.е. если сдвинуты на пол строки и дошли до последней, то крутатнуть надо до 0,
       //а никак не в отрицательную позицию
       curPos := Max(0, curPos);
@@ -3239,12 +3239,12 @@ begin
     VK_PRIOR:
       begin
         //кол-во видимых строк
-        DeltaRow := Ceil((ClientRect.Height - GetTitleHeight) / RowHeight);
+        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
         SelectNextRow(-DeltaRow);
       end;
     VK_NEXT:
       begin
-        DeltaRow := Ceil((ClientRect.Height - GetTitleHeight) / RowHeight);
+        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
         SelectNextRow(DeltaRow);
       end;
     VK_HOME:
@@ -3648,7 +3648,6 @@ procedure TvpGantt.ShowRowHintWindow(APoint: TPoint);
 var
   txt, AppHint: string;
   duration, complete: Double;
-  fDT: string;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.ShowRowHintWindow');
@@ -3656,7 +3655,6 @@ begin
   //если не показывать хинт для строк или строки отсутсвубт под курсором мыши
   if not (vpgRowHint in Options) OR (FMouseInterval<0) then
     Exit;
-  fDT := FDateFormat;
   //строим подсказку
   txt := TvpInterval(FIntervals[FMouseInterval]).Name;
   txt := txt + LineEnding + RS_HINT_STARTDATE + FormatDateTime(DateFormat, TvpInterval(FIntervals[FMouseInterval]).StartDate);
