@@ -153,7 +153,7 @@ begin
   GanttDiagram.MajorScale := vptsMonth;
   GanttDiagram.MinorScale := vptsDay;
   GanttDiagram.TitleStyle := tsNative;
-  GanttDiagram.GanttBorderWidth := 1;
+  GanttDiagram.GridBorderWidth := 1;
   GanttDiagram.Hint := 'Это стандартный скрипт';
   //Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   GanttDiagram.SetFocus;

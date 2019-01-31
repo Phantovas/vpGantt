@@ -329,6 +329,7 @@ type
   {TvpGantt}
   TvpGantt = class(TCustomControl)
     private
+      FDateFormat: String;
       FEndDate: TDate;
       FFactIntervalColor: TColor;
       FPlanIntervalColor: TColor;
@@ -358,7 +359,7 @@ type
       FMajorScaleHeight: integer;
       FMinorScaleHeight: integer;
       FIntervalsHeight: integer;
-      FGanttBorderWidth: integer;
+      FGridBorderWidth: integer;
       FBorderColor: TColor;
       FFocusColor: TColor;
       FRowHighlightColor: TColor;
@@ -385,6 +386,7 @@ type
       function GetTaskTitleCaption: TCaption;
       procedure OnTitleFontChanged(Sender: TObject);
       function OptionsIsStored: Boolean;
+      procedure SetDateFormat(AValue: String);
       procedure SetEndDate(AValue: TDate);
       procedure SetExpiredIntervalColor(AValue: TColor);
       procedure SetFactIntervalColor(AValue: TColor);
@@ -398,7 +400,7 @@ type
       procedure SetPixelPerMinorScale(AValue: integer);
       procedure SetPlanIntervalColor(AValue: TColor);
       procedure SetRowHeight(AValue: integer);
-      procedure SetGanttBorderWidth(AValue: integer);
+      procedure SetGridBorderWidth(AValue: integer);
       procedure SetBorderColor(AValue: TColor);
       procedure SetStartDate(AValue: TDate);
       procedure SetTaskColor(AValue: TColor);
@@ -496,7 +498,8 @@ type
       //custom property
       property BorderColor: TColor read FBorderColor write SetBorderColor default clActiveBorder;
       property EndDate: TDate read FEndDate write SetEndDate;
-      property GanttBorderWidth: Integer read FGanttBorderWidth write SetGanttBorderWidth default 1;
+      property DateFormat: String read FDateFormat write SetDateFormat;
+      property GridBorderWidth: Integer read FGridBorderWidth write SetGridBorderWidth default 1;
       property MajorScale: TvpTimeScale read GetMajorScale write SetMajorScale default vptsMonth;
       property MajorScaleHeight: integer read FMajorScaleHeight write SetMajorScaleHeight default C_DEF_ROW_HEIGHT;
       property MinorScale: TvpTimeScale read GetMinorScale write SetMinorScale default vptsDay;
@@ -509,10 +512,10 @@ type
       property TitleFont: TFont read FTitleFont write SetTitleFont;
       property TitleStyle: TTitleStyle read FTitleStyle write SetTitleStyle;
       //TODO: Move this properties to child control OR stay this HOW RULES?
+      property CalendarColor:TColor read GetCalendarColor write SetCalendarColor default clWindow;
       property TaskColor: TColor read GetTaskColor write SetTaskColor default clWindow;
       property TitleColor: TColor read FTitleColor write SetTitleColor default clBtnFace;
       property TaskTitleCaption: TCaption read GetTaskTitleCaption write SetTaskTitleCaption;
-      property CalendarColor:TColor read GetCalendarColor write SetCalendarColor default clWindow;
       property PlanIntervalColor: TColor read FPlanIntervalColor write SetPlanIntervalColor default clSkyBlue;
       property FactIntervalColor: TColor read FFactIntervalColor write SetFactIntervalColor default clBlue;
       property FreeIntervalColor: TColor read FFreeIntervalColor write SetFreeIntervalColor default clLime;
@@ -2825,6 +2828,19 @@ begin
   Result := FvpGanttOptions <> DefaultGanttOptions;
 end;
 
+procedure TvpGantt.SetDateFormat(AValue: String);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.SetDateFormat');
+  {$endif}
+  if Trim(AValue) = '' then
+    AValue := DefaultFormatSettings.ShortDateFormat + ' ' +
+              DefaultFormatSettings.ShortTimeFormat;
+  if FDateFormat = AValue then
+    Exit;
+  FDateFormat := AValue;
+end;
+
 procedure TvpGantt.SetEndDate(AValue: TDate);
 var
   aDT: TDateTime;
@@ -2999,14 +3015,14 @@ begin
   VisualChange;
 end;
 
-procedure TvpGantt.SetGanttBorderWidth(AValue: integer);
+procedure TvpGantt.SetGridBorderWidth(AValue: integer);
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetBorderWidth');
   {$endif}
-  if FGanttBorderWidth = AValue then
+  if FGridBorderWidth = AValue then
     Exit;
-  FGanttBorderWidth := AValue;
+  FGridBorderWidth := AValue;
   VisualChange;
 end;
 
@@ -3421,8 +3437,8 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.GetBorderWidth');
   {$endif}
-  if FGanttBorderWidth > 0 then
-    Result := FGanttBorderWidth
+  if FGridBorderWidth > 0 then
+    Result := FGridBorderWidth
   else
     Result := 0;
 end;
@@ -3640,17 +3656,16 @@ begin
   //если не показывать хинт для строк или строки отсутсвубт под курсором мыши
   if not (vpgRowHint in Options) OR (FMouseInterval<0) then
     Exit;
+  fDT := FDateFormat;
   //строим подсказку
-  {TODO -o Vas: Вынести формат даты в свойства компонента}
-  fDT := 'dd.mm.yy hh:nn:ss';
   txt := TvpInterval(FIntervals[FMouseInterval]).Name;
-  txt := txt + LineEnding + RS_HINT_STARTDATE + FormatDateTime(fDT, TvpInterval(FIntervals[FMouseInterval]).StartDate);
+  txt := txt + LineEnding + RS_HINT_STARTDATE + FormatDateTime(DateFormat, TvpInterval(FIntervals[FMouseInterval]).StartDate);
   //продолжительность в часах
   duration := RoundTo(TvpInterval(FIntervals[FMouseInterval]).Duration * 24, -2);
   txt := txt + LineEnding + RS_HINT_DURATION + FloatToStr(duration) + ' ' + RS_HOUR;
   if TvpInterval(FIntervals[FMouseInterval]).FFinishDate>0 then
     begin
-      txt := txt + LineEnding + RS_HINT_FINISHDATE + FormatDateTime(fDT, TvpInterval(FIntervals[FMouseInterval]).FinishDate);
+      txt := txt + LineEnding + RS_HINT_FINISHDATE + FormatDateTime(DateFormat, TvpInterval(FIntervals[FMouseInterval]).FinishDate);
       complete := RoundTo(TvpInterval(FIntervals[FMouseInterval]).Complete * 24, -2);
       txt := txt + LineEnding + RS_HINT_COMPLETE + FloatToStr(complete) + ' ' + RS_HOUR;
     end;
@@ -3822,7 +3837,7 @@ begin
   Width := C_VPGANTT_WIDTH;
   Height := C_VPGANTT_HEIGHT;
 
-  GanttBorderWidth := C_DEF_BORDER_WIDTH;
+  GridBorderWidth := C_DEF_BORDER_WIDTH;
   TitleColor := clBtnFace;
   TaskColor := clWindow;
   CalendarColor := clWindow;
@@ -3867,6 +3882,8 @@ begin
   FFocusColor := clBlack;
 
   TaskTitleCaption := RS_TITLE_TASKS;
+
+  DateFormat := '';
 
   StartDate := Now;
 
@@ -4155,7 +4172,7 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.DrawTitleGrid');
   {$endif}
-  if FGanttBorderWidth>0 then
+  if FGridBorderWidth>0 then
     begin
       //не рисуем обводку, если у нас используются стили
       if FTitleStyle = tsNative then
