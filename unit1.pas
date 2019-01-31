@@ -40,6 +40,9 @@ type
     { private declarations }
     procedure LogBoundsRect(Control: TControl);
     procedure LogClientRect(Control: TControl);
+    procedure MDown(Sender: Tobject; Button: TMouseButton; Shift:TShiftState; X,Y:Integer);
+    procedure MMove(Sender: Tobject; Shift:TShiftState; X,Y:Integer);
+    procedure MUp(Sender: Tobject; Button: TMouseButton; Shift:TShiftState; X,Y:Integer);
   public
     { public declarations }
     procedure Debug(AMessage: string; AShowMessage: boolean = false);
@@ -91,7 +94,7 @@ begin
   for i:=0 to 5 do
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
-      GInterval.Name := IntToStr(i) + '  123456789abcdefghijklmnopqrstuvwxyz' ;
+      GInterval.Name := 'Наряд №' + IntToStr(i) + ' от ' + DateToStr(Now-10+i);
       GInterval.StartDate := Now - 4 + i;
       GInterval.Duration := 10;
       if i = 4 then
@@ -146,13 +149,17 @@ begin
   GanttDiagram.Align := alClient;
   GanttDiagram.ScrollBars := ssAutoBoth;
   GanttDiagram.BorderStyle := bsSingle;
-  GanttDiagram.TaskTitleCaption := 'Проекты';
+  GanttDiagram.TaskTitleCaption := 'Наряды';
   GanttDiagram.MajorScale := vptsMonth;
   GanttDiagram.MinorScale := vptsDay;
   GanttDiagram.TitleStyle := tsNative;
   GanttDiagram.GanttBorderWidth := 1;
+  GanttDiagram.Hint := 'Это стандартный скрипт';
   //Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   GanttDiagram.SetFocus;
+  //GanttDiagram.OnMouseDown := @MDown;
+  //GanttDiagram.OnMouseMove := @MMove;
+  //GanttDiagram.OnMouseUp := @MUp;
 
   //GC :=  TgsGantt.Create(Self);
   //GC.Parent := Self;
@@ -210,6 +217,22 @@ begin
   Memo1.Lines.Add('ClientRect.Top ' + IntToStr(Control.ClientRect.Top));
   Memo1.Lines.Add('ClientRect.Width ' + IntToStr(Control.ClientRect.Width));
   Memo1.Lines.Add('ClientRect.Height ' + IntToStr(Control.ClientRect.Height));
+end;
+
+procedure TForm1.MDown(Sender: Tobject; Button: TMouseButton; Shift:TShiftState; X,Y:Integer);
+begin
+  Memo1.Lines.Add('OnMouseDown ' + Format('x %d y %d',[X, Y]));
+end;
+
+procedure TForm1.MMove(Sender: Tobject; Shift: TShiftState; X, Y: Integer);
+begin
+  Memo1.Lines.Add('OnMouseMove ' + Format('x %d y %d',[X, Y]));
+end;
+
+procedure TForm1.MUp(Sender: Tobject; Button: TMouseButton; Shift: TShiftState;
+  X, Y: Integer);
+begin
+  Memo1.Lines.Add('OnMouseUp ' + Format('x %d y %d',[X, Y]));
 end;
 
 end.

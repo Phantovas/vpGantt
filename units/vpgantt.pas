@@ -2,27 +2,27 @@
 /******************************************************************************/
                             vpGantt.pas
                             -----------
+                             ver. 0.3a
 
                      Gantt Diagramm component unit
                 Drawing a gantt diagramm from an interval list.
 --------------------------------------------------------------------------------
 
-@git https://github.com/Phantovas/vpGantt
+  @git: https://github.com/Phantovas/vpGantt
 
-@https https://github.com/Phantovas/vpGantt.git
-@ssh git@github.com:Phantovas/vpGantt.git
+  @clone on https: https://github.com/Phantovas/vpGantt.git
+  @clone on ssh: git@github.com:Phantovas/vpGantt.git
 
-@Author:: Vasiliy Ponomarjov
-@Email: phantovas@gmail.com
-@created: 06-JAN-2019
-@modified: 30-JAN-2019
-@version: 0.3a
+  @Author: Vasiliy Ponomarjov
+  @Email: phantovas@gmail.com
+  @created: 06-JAN-2019
+  @modified: 31-JAN-2019
+  @version: 0.3a
 
 /******************************************************************************/
- This file is part of the Lazarus Component Library (LCL)
 
- See the file COPYING.modifiedLGPL.txt, included in this distribution,
- for details about the license.
+  See the file COPYING.modifiedLGPL.txt, included in this distribution,
+  for details about the license.
 
 /******************************************************************************/
 }
@@ -80,7 +80,8 @@ type
                 vpgMoveFocusToNewInterval,    //перемещать фокус на добавленную строку
                 vpgVertLine,                  //вертикальный бордюр в сетке
                 vpgHorzLine,                  //горизонтальный бордюр в сетке
-                vpgExtendVertLines            //вертикальные разделители в высоту компонента
+                vpgExtendVertLines,           //вертикальные разделители в высоту компонента
+                vpgRowHint                    //всплывающие подсказки для каждой строки
                 );
 
   TvpGanttOptions = set of TvpgOption;
@@ -118,7 +119,8 @@ const
                          vpgMajorVertLine,
                          vpgRowHighlight,
                          vpgHorzLine,
-                         vpgVertLine
+                         vpgVertLine,
+                         vpgRowHint
                         ];
 
 resourcestring
@@ -135,7 +137,11 @@ resourcestring
   RS_HOUR = 'ч.';
   RS_WEEK = 'Нед. ';
   RS_KW = 'Кв. ';
-
+  //хинты
+  RS_HINT_STARTDATE = 'Начало: ';
+  RS_HINT_DURATION = 'Продолжительность: ';
+  RS_HINT_FINISHDATE = 'Окончание: ';
+  RS_HINT_COMPLETE = 'Выполнено за: ';
 
 type
   TvpGantt = class;
@@ -164,6 +170,7 @@ type
       FvpGantt: TvpGantt;
       FPlanRect: TRect;  //область планируемого времени
       FFactRect: TRect;  //область фактического времени
+      function GetComplete: Double;
       function GetFinishDate: TDateTime;
       procedure SetDuration(AValue: Double);
       procedure SetFinishDate(AValue: TDateTime);
@@ -182,6 +189,7 @@ type
       property StartDate: TDateTime read FStartDate write SetStartDate;
       property FinishDate: TDateTime read GetFinishDate write SetFinishDate;
       property Duration: Double read FDuration write SetDuration;
+      property Complete: Double read GetComplete;
   end;
 
   { TvpGanttTasks }
@@ -224,6 +232,9 @@ type
       procedure GetSBRanges(const HsbVisible: boolean;
                     out HsbRange, HsbPage, HsbPos: Integer);
       procedure InvalidateRow(aRow: integer);
+      procedure MouseDown(Button: TMouseButton; Shift:TShiftState; X,Y:Integer); override;
+      procedure MouseMove(Shift: TShiftState; X,Y: Integer); override;
+      procedure MouseUp(Button: TMouseButton; Shift:TShiftState; X,Y:Integer); override;
       procedure Paint; override;
       function  ScrollBarIsVisible(Which:Integer): Boolean;
       procedure ScrollBarPosition(Which, Value: integer);
@@ -231,7 +242,6 @@ type
       procedure ScrollBarShow(Which: Integer; aValue: boolean);
       procedure UpdateHorzScrollBar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure WMHScroll(var message : TLMHScroll); message LM_HSCROLL;
-      procedure WMLButtonDown(var message: TLMLButtonDown); message LM_LBUTTONDOWN;
     public
       constructor Create(AOwner: TvpGantt);  reintroduce;
       destructor Destroy; override;
@@ -296,6 +306,9 @@ type
       procedure GetSBRanges(const HsbVisible,VsbVisible: boolean;
                     out HsbRange,VsbRange,HsbPage,VsbPage,HsbPos,VsbPos:Integer);
       procedure InvalidateRow(aRow: integer);
+      procedure MouseDown(Button: TMouseButton; Shift:TShiftState; X,Y:Integer); override;
+      procedure MouseMove(Shift: TShiftState; X,Y: Integer); override;
+      procedure MouseUp(Button: TMouseButton; Shift:TShiftState; X,Y:Integer); override;
       procedure Paint; override;
       procedure ScrollBarRange(Which:Integer; aRange,aPage,aPos: Integer);
       procedure ScrollBarPosition(Which, Value: integer);
@@ -308,7 +321,6 @@ type
       procedure VisualChange; virtual;
       procedure WMHScroll(var message : TLMHScroll); message LM_HSCROLL;
       procedure WMVScroll(var message : TLMVScroll); message LM_VSCROLL;
-      procedure WMLButtonDown(var message: TLMLButtonDown); message LM_LBUTTONDOWN;
     public
       constructor Create(AOwner: TvpGantt);  reintroduce;
       destructor Destroy; override;
@@ -333,6 +345,8 @@ type
       FScrollBarWidth: integer;
       FGanttFocused: boolean;
       FFocusRect: TRect;
+      FMouseInterval: integer;
+      FSavedHint: string;
 
       FIntervals: TList;
       FStartDateOfBound: TDateTime;
@@ -403,12 +417,6 @@ type
       procedure CutBorderFromRect(var aRect: TRect);
       procedure CutHBorderFromRect(var aRect: TRect);
       procedure CutVBorderFromRect(var aRect: TRect);
-      function GetIntervalsHeight: integer; //высота всех интервалов
-      function GetFocusRow: integer;
-      function GetMajorScaleHeight: integer;
-      function GetMinorScaleHeight: integer;
-      function GetRowPosY(const YPos: integer): integer;
-      function GetTitleHeight: integer;
       procedure DrawCellGrid(ACanvas: TCanvas; const aRect: TRect);
       procedure DrawCell(aRow: integer; ACanvas: TCanvas; const aRect: TRect);
       procedure DrawFocusRect(ACanvas: TCanvas; const aRect: TRect);
@@ -419,17 +427,31 @@ type
       procedure DrawTitleCell(ACanvas: TCanvas; const aRect: TRect);
       procedure DrawTitleText(ACanvas: TCanvas; const aRect: TRect; aText: string; aAligment: TAlignment = taLeftJustify);
       procedure FontChanged(Sender: TObject); override;
+      function GetIntervalsHeight: integer; //высота всех интервалов
+      function GetFocusRow: integer;
+      function GetMajorScaleHeight: integer;
+      function GetMinorScaleHeight: integer;
+      function GetRowPosY(const YPos: integer): integer;
+      function GetTitleHeight: integer;
+      procedure HideRowHintWindow;
       procedure InvalidateFocused;
       procedure InvalidateRow(aRow: integer);
       procedure KeyDown(var Key : Word; Shift : TShiftState); override;
       procedure KeyUp(var Key : Word; Shift : TShiftState); override;
       procedure KeyPress(var Key: char); override;
+      procedure MouseDown(Button: TMouseButton; Shift:TShiftState; X,Y:Integer); override;
+      procedure MouseMove(Shift: TShiftState; X,Y: Integer); override;
+      procedure MouseUp(Button: TMouseButton; Shift:TShiftState; X,Y:Integer); override;
       procedure Paint; override;
       function  ScrollBarAutomatic(Which: TScrollStyle): boolean;
       procedure SetFocusRow(AValue: integer);
       procedure SelectNextRow(const ADelta: integer);
+      procedure ShowRowHintWindow(APoint: TPoint);
       procedure UpdateBoundDates(AStartDate, AEndDate: TDate);
       procedure VisualChange;
+      //messages event
+      procedure CMMouseEnter(var Message: TLMessage); message CM_MOUSEENTER;
+      procedure CMMouseLeave(var Message :TLMessage); message CM_MouseLeave;
     public
       constructor Create(AOwner: TComponent); override;
       destructor Destroy; override;
@@ -462,9 +484,15 @@ type
       property BorderStyle;
       property BorderWidth;
       //events
+      property OnClick;
+      property OnDblClick;
+      property OnResize;
       property OnKeyDown;
       property OnKeyPress;
       property OnKeyUp;
+      property OnMouseDown;
+      property OnMouseMove;
+      property OnMouseUp;
       //custom property
       property BorderColor: TColor read FBorderColor write SetBorderColor default clActiveBorder;
       property EndDate: TDate read FEndDate write SetEndDate;
@@ -1017,12 +1045,23 @@ end;
 function TvpInterval.GetFinishDate: TDateTime;
 begin
   {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.SetDuration');
+  Form1.Debug('TvpInterval.GetFinishDate');
   {$endif}
   if FFinishDate=0 then
     Result := FStartDate + FDuration
   else
     Result := FFinishDate;
+end;
+
+function TvpInterval.GetComplete: Double;
+begin
+  {$ifdef DBGINTERVAL}
+  Form1.Debug('TvpInterval.GetFinishDate');
+  {$endif}
+  if FFinishDate=0 then
+    Result := 0
+  else
+    Result := FFinishDate - FStartDate;
 end;
 
 { Процедура расчета области планируемой длительности интервала
@@ -1517,22 +1556,6 @@ begin
 
   //FvpGantt.CalcFocusRect;
   FvpGantt.Repaint;
-end;
-
-procedure TvpGanttCalendar.WMLButtonDown(var message: TLMLButtonDown);
-var
-  aRow: integer;
-begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.WMLButtonDown');
-  Form1.EL.Debug('x %d y %d',[message.XPos, message.YPos]);
-  {$endif}
-  inherited;
-
-  aRow := FvpGantt.GetRowPosY(message.YPos);
-  if aRow>-1 then
-    FvpGantt.SetFocusRow(aRow);
-  FvpGantt.SetFocus;
 end;
 
 procedure TvpGanttCalendar.WMSize(var Message: TLMSize);
@@ -2054,6 +2077,32 @@ begin
   InvalidateRect(Handle, @R, true);
 end;
 
+procedure TvpGanttCalendar.MouseDown(Button: TMouseButton; Shift: TShiftState;
+  X, Y: Integer);
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.MouseDown');
+  {$endif}
+  FvpGantt.MouseDown(Button, Shift, X, Y);
+end;
+
+procedure TvpGanttCalendar.MouseMove(Shift: TShiftState; X, Y: Integer);
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.MouseMove');
+  {$endif}
+  FvpGantt.MouseMove(Shift, X, Y);
+end;
+
+procedure TvpGanttCalendar.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
+  Y: Integer);
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.MouseUp');
+  {$endif}
+  FvpGantt.MouseUp(Button, Shift, X, Y);
+end;
+
 procedure TvpGanttCalendar.Paint;
 begin
   {$ifdef DBGGANTTCALENDAR}
@@ -2432,6 +2481,32 @@ begin
   InvalidateRect(Handle, @R, true);
 end;
 
+procedure TvpGanttTasks.MouseDown(Button: TMouseButton; Shift: TShiftState; X,
+  Y: Integer);
+begin
+  {$ifdef DBGGANTTTASKS}
+  Form1.Debug('TvpGanttTasks.MouseDown');
+  {$endif}
+  FvpGantt.MouseDown(Button, Shift, X, Y);
+end;
+
+procedure TvpGanttTasks.MouseMove(Shift: TShiftState; X, Y: Integer);
+begin
+  {$ifdef DBGGANTTTASKS}
+  Form1.Debug('TvpGanttTasks.MouseMove');
+  {$endif}
+  FvpGantt.MouseMove(Shift, X, Y);
+end;
+
+procedure TvpGanttTasks.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
+  Y: Integer);
+begin
+  {$ifdef DBGGANTTTASKS}
+  Form1.Debug('TvpGanttTasks.MouseUp');
+  {$endif}
+  FvpGantt.MouseUp(Button, Shift, X, Y);
+end;
+
 procedure TvpGanttTasks.Paint;
 begin
   {$ifdef DBGGANTTTASKS}
@@ -2604,22 +2679,6 @@ begin
   {$endif}
 
   Invalidate;
-end;
-
-procedure TvpGanttTasks.WMLButtonDown(var message: TLMLButtonDown);
-var
-  aRow: integer;
-begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.WMLButtonDown');
-  Form1.EL.Debug('x %d y %d',[message.XPos, message.YPos]);
-  {$endif}
-  inherited;
-
-  aRow := FvpGantt.GetRowPosY(message.YPos);
-  if aRow>-1 then
-    FvpGantt.SetFocusRow(aRow);
-  FvpGantt.SetFocus;
 end;
 
 constructor TvpGanttTasks.Create(AOwner: TvpGantt);
@@ -3068,9 +3127,19 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.SetFocus');
   {$endif}
-  inherited;
-  FGanttFocused := true;
-  VisualChange;
+  if not Focused and not(csNoFocus in ControlStyle) then
+    begin
+      inherited;
+      FGanttFocused := true;
+      VisualChange;
+    end
+  else
+    begin
+      {$ifDef DBGGANTTCALENDAR}
+      DebugLnExit('TvpGanttCalendar.MouseDown EXIT: Focus not allowed');
+      {$Endif}
+      Exit;
+    end;
 end;
 
 procedure TvpGantt.InvalidateFocused;
@@ -3201,6 +3270,57 @@ begin
   inherited KeyPress(Key);
 end;
 
+procedure TvpGantt.MouseDown(Button: TMouseButton; Shift: TShiftState; X,
+  Y: Integer);
+var
+  aRow: integer;
+begin
+  inherited MouseDown(Button, Shift, X, Y);
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.MouseDown');
+  Form1.EL.Debug('x %d y %d',[X, Y]);
+  {$endif}
+  aRow := GetRowPosY(Y);
+  if aRow>-1 then
+    SetFocusRow(aRow);
+  SetFocus;
+end;
+
+procedure TvpGantt.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  aRow: integer;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.MouseMove');
+  Form1.EL.Debug('x %d y %d',[X, Y]);
+  {$endif}
+  inherited MouseMove(Shift, X, Y);
+
+  if csDesigning in ComponentState then
+    Exit;
+
+  aRow := GetRowPosY(Y);
+  FMouseInterval := aRow;
+
+  if ShowHint AND (FMouseInterval>-1) then
+    begin
+      Application.CancelHint;
+      ShowRowHintWindow(Point(X,Y));
+    end
+  else
+    Hint := FSavedHint;
+end;
+
+procedure TvpGantt.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
+  Y: Integer);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.MouseUp');
+  Form1.EL.Debug('x %d y %d',[X, Y]);
+  {$endif}
+  inherited MouseUp(Button, Shift, X, Y);
+end;
+
 function TvpGantt.ScrollBarAutomatic(Which: TScrollStyle): boolean;
 begin
   {$ifdef DBGGANTT}
@@ -3233,6 +3353,21 @@ begin
       if FvpGanttCalendar.HandleAllocated then
         FvpGanttCalendar.VisualChange;
     end;
+end;
+
+procedure TvpGantt.CMMouseEnter(var Message: TLMessage);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.CMMouseEnter');
+  {$endif}
+  inherited;
+  FSavedHint := Hint;
+end;
+
+procedure TvpGantt.CMMouseLeave(var Message: TLMessage);
+begin
+  Hint := FSavedHint;
+  inherited CMMouseLeave(Message);
 end;
 
 procedure TvpGantt.UpdateSizes;
@@ -3493,6 +3628,46 @@ begin
   SetFocusRow(aRow);
 end;
 
+procedure TvpGantt.ShowRowHintWindow(APoint: TPoint);
+var
+  txt, AppHint: string;
+  duration, complete: Double;
+  fDT: string;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.ShowRowHintWindow');
+  {$endif}
+  //если не показывать хинт для строк или строки отсутсвубт под курсором мыши
+  if not (vpgRowHint in Options) OR (FMouseInterval<0) then
+    Exit;
+  //строим подсказку
+  {TODO -o Vas: Вынести формат даты в свойства компонента}
+  fDT := 'dd.mm.yy hh:nn:ss';
+  txt := TvpInterval(FIntervals[FMouseInterval]).Name;
+  txt := txt + LineEnding + RS_HINT_STARTDATE + FormatDateTime(fDT, TvpInterval(FIntervals[FMouseInterval]).StartDate);
+  //продолжительность в часах
+  duration := RoundTo(TvpInterval(FIntervals[FMouseInterval]).Duration * 24, -2);
+  txt := txt + LineEnding + RS_HINT_DURATION + FloatToStr(duration) + ' ' + RS_HOUR;
+  if TvpInterval(FIntervals[FMouseInterval]).FFinishDate>0 then
+    begin
+      txt := txt + LineEnding + RS_HINT_FINISHDATE + FormatDateTime(fDT, TvpInterval(FIntervals[FMouseInterval]).FinishDate);
+      complete := RoundTo(TvpInterval(FIntervals[FMouseInterval]).Complete * 24, -2);
+      txt := txt + LineEnding + RS_HINT_COMPLETE + FloatToStr(complete) + ' ' + RS_HOUR;
+    end;
+  if (txt = '') and (FSavedHint <> '') then
+    txt := FSavedHint;
+  if (AppHint = '') then
+    AppHint := FSavedHint;
+  if (txt <> '') and not (csDesigning in ComponentState) then
+    begin
+      Hint := txt;
+      Application.Hint := AppHint;
+      Application.ActivateHint(ClientToScreen(APoint));
+    end
+  else
+    HideRowHintWindow;
+end;
+
 { Расчет начального времени интервалов и конечного. Они могут не совпадать с заданными датами.
   Например, дата начальная 12 января 2019 года, дака коенчная 23 марта 2019 года, старшаа шкала
   задана как vptsMonth, тогда нам надо сделать количество диапазонов в старшей шкале кратное месяцам, это
@@ -3688,6 +3863,7 @@ begin
                       GetSystemMetrics(SM_SWSCROLLBARSPACING);
 
   FFocusRow := -1;
+  FMouseInterval := -1;
   FFocusColor := clBlack;
 
   TaskTitleCaption := RS_TITLE_TASKS;
@@ -3855,6 +4031,15 @@ begin
   Form1.Debug('TvpGantt.GetTitleHeight');
   {$endif}
   Result := FMajorScaleHeight + FMinorScaleHeight;
+end;
+
+procedure TvpGantt.HideRowHintWindow;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.HideRowHintWindow');
+  {$endif}
+  Hint := FSavedHint;
+  Application.CancelHint;
 end;
 
 procedure TvpGantt.DrawCellGrid(ACanvas: TCanvas; const aRect: TRect);
