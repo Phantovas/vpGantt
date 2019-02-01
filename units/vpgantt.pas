@@ -3239,29 +3239,13 @@ begin
     VK_PRIOR:
       begin
         //кол-во видимых строк
-<<<<<<< HEAD
-<<<<<<< HEAD
-        DeltaRow := Ceil((ClientRect.Height - FScrollBarHeight - GetTitleHeight) / RowHeight);
-=======
         DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
->>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
-=======
-        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
->>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
         SelectNextRow(-DeltaRow);
         {TODO -oVas: неправильно работает прокрутка постраничная}
       end;
     VK_NEXT:
       begin
-<<<<<<< HEAD
-<<<<<<< HEAD
-        DeltaRow := Ceil((ClientRect.Height - FScrollBarHeight - GetTitleHeight) / RowHeight);
-=======
         DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
->>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
-=======
-        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
->>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
         SelectNextRow(DeltaRow);
       end;
     VK_HOME:
@@ -3665,6 +3649,7 @@ procedure TvpGantt.ShowRowHintWindow(APoint: TPoint);
 var
   txt, AppHint: string;
   duration, complete: Double;
+  fDT: string;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.ShowRowHintWindow');
@@ -3672,6 +3657,7 @@ begin
   //если не показывать хинт для строк или строки отсутсвубт под курсором мыши
   if not (vpgRowHint in Options) OR (FMouseInterval<0) then
     Exit;
+  fDT := FDateFormat;
   //строим подсказку
   txt := TvpInterval(FIntervals[FMouseInterval]).Name;
   txt := txt + LineEnding + RS_HINT_STARTDATE + FormatDateTime(DateFormat, TvpInterval(FIntervals[FMouseInterval]).StartDate);
