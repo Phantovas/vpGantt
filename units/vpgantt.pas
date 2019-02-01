@@ -3239,13 +3239,45 @@ begin
     VK_PRIOR:
       begin
         //кол-во видимых строк
+<<<<<<< HEAD
         DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
+=======
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+        DeltaRow := Ceil((ClientRect.Height - FScrollBarHeight - GetTitleHeight) / RowHeight);
+=======
+        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
+>>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
+=======
+        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
+>>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
+=======
+        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
+>>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
+>>>>>>> origin
         SelectNextRow(-DeltaRow);
         {TODO -oVas: неправильно работает прокрутка постраничная}
       end;
     VK_NEXT:
       begin
+<<<<<<< HEAD
         DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
+=======
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+        DeltaRow := Ceil((ClientRect.Height - FScrollBarHeight - GetTitleHeight) / RowHeight);
+=======
+        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
+>>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
+=======
+        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
+>>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
+=======
+        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
+>>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
+>>>>>>> origin
         SelectNextRow(DeltaRow);
       end;
     VK_HOME:
