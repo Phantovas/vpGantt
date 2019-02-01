@@ -3241,7 +3241,11 @@ begin
         //кол-во видимых строк
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         DeltaRow := Ceil((ClientRect.Height - FScrollBarHeight - GetTitleHeight) / RowHeight);
+=======
+        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
+>>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
 =======
         DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
 >>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
@@ -3255,7 +3259,11 @@ begin
       begin
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         DeltaRow := Ceil((ClientRect.Height - FScrollBarHeight - GetTitleHeight) / RowHeight);
+=======
+        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
+>>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
 =======
         DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
 >>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
