@@ -45,6 +45,7 @@ unit vpGantt;
 //{$define DBGGANTTCALENDAR}
 //{$define DBGSCROLL}
 //{$define DBGDRAW}
+//{$define DBGFOCUS}
 
 interface
 
@@ -344,7 +345,6 @@ type
       FVScrollPosition: integer;
       FScrollBarHeight: integer;
       FScrollBarWidth: integer;
-      FGanttFocused: boolean;
       FFocusRect: TRect;
       FMouseInterval: integer;
       FSavedHint: string;
@@ -413,6 +413,7 @@ type
       procedure UpdateSizes;
       procedure WMSize(var message: TLMSize); message LM_SIZE;
       procedure WMKillFocus(var message: TLMKillFocus); message LM_KILLFOCUS;
+      procedure WMSetFocus(var message: TLMSetFocus); message LM_SETFOCUS;
     protected
       procedure CalcIntervalsHeight;
       procedure CalcFocusRect;
@@ -472,6 +473,7 @@ type
       function GetEndDateOfBound: TDateTime;
       procedure RecalcIntervals;
       procedure UpdateDates;
+      function Focused: boolean; override;
 
       procedure BeginUpdate;
       procedure EndUpdate(aRefresh: boolean = true);
@@ -3146,16 +3148,15 @@ begin
   if not Focused and not(csNoFocus in ControlStyle) then
     begin
       inherited;
-      FGanttFocused := true;
-      VisualChange;
-    end
-  else
-    begin
-      {$ifDef DBGGANTTCALENDAR}
-      DebugLnExit('TvpGanttCalendar.MouseDown EXIT: Focus not allowed');
-      {$Endif}
-      Exit;
+      InvalidateFocused;
     end;
+  //else
+  //  begin
+  //    {$ifDef DBGGANTTCALENDAR}
+  //    DebugLnExit('TvpGanttCalendar.MouseDown EXIT: Focus not allowed');
+  //    {$Endif}
+  //    Exit;
+  //  end;
 end;
 
 procedure TvpGantt.InvalidateFocused;
@@ -3239,45 +3240,13 @@ begin
     VK_PRIOR:
       begin
         //кол-во видимых строк
-<<<<<<< HEAD
         DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        DeltaRow := Ceil((ClientRect.Height - FScrollBarHeight - GetTitleHeight) / RowHeight);
-=======
-        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
->>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
-=======
-        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
->>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
-=======
-        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
->>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
->>>>>>> origin
         SelectNextRow(-DeltaRow);
         {TODO -oVas: неправильно работает прокрутка постраничная}
       end;
     VK_NEXT:
       begin
-<<<<<<< HEAD
         DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        DeltaRow := Ceil((ClientRect.Height - FScrollBarHeight - GetTitleHeight) / RowHeight);
-=======
-        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
->>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
-=======
-        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
->>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
-=======
-        DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
->>>>>>> 66158a349c08223ec8ec448c3ebc5897947551a9
->>>>>>> origin
         SelectNextRow(DeltaRow);
       end;
     VK_HOME:
@@ -3461,7 +3430,22 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.WMKillFocus');
   {$endif}
-  FGanttFocused := false;
+  InvalidateFocused;
+end;
+
+procedure TvpGantt.WMSetFocus(var message: TLMSetFocus);
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.WMSetFocus');
+  {$endif}
+  {$ifdef DBGFOCUS}
+  Form1.Debug('*** gantt.WMSetFocus, FocusedWnd=' + dbgs(Message.FocusedWnd) + ' [' + dbgs(pointer(Message.FocusedWnd))+'] ');
+  if Message.FocusedWnd=Self.Handle then
+    Form1.EL.Debug('Same Grid!')
+  else
+    Form1.EL.Debug('ExternalWindow');
+  {$endif}
+  inherited WMSetFocus(Message);
   InvalidateFocused;
 end;
 
@@ -3584,6 +3568,33 @@ begin
   for i:=0 to IntervalCount-1 do
     UpdateInterval(i);
   VisualChange;
+end;
+
+function TvpGantt.Focused: boolean;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.Focused');
+  {$endif}
+  Result := inherited Focused;
+  {$ifdef DBGFOCUS}
+  Form1.EL.Debug('Result inherited %d', [Integer(Result)]);
+  {$endif}
+  Result := Result AND CanTab;
+  {$ifdef DBGFOCUS}
+  Form1.EL.Debug('Result FindOwnerControl %d', [Integer(Result)]);
+  {$endif}
+  //если задачник в фокусе
+  if FvpGanttTasks.HandleAllocated then
+    Result := Result OR FvpGanttTasks.Focused;
+  {$ifdef DBGFOCUS}
+  Form1.EL.Debug('Result FvpGanttTasks %d', [Integer(Result)]);
+  {$endif}
+  //или календарь
+  if FvpGanttCalendar.HandleAllocated then
+    Result := Result OR FvpGanttCalendar.Focused;
+  {$ifdef DBGFOCUS}
+  Form1.EL.Debug('Result FvpGanttCalendar %d', [Integer(Result)]);
+  {$endif}
 end;
 
 function TvpGantt.GetMinorScaleHeight: integer;
@@ -4176,7 +4187,7 @@ begin
   Form1.EL.Debug('Focused %d', [Integer(Focused)]);
   {$endif}
   //дальше рисуем
-  if FGanttFocused then
+  if Focused then
     begin
       //если фокус подсвечивать
       if (vpgFocusHighlight in Options) then
@@ -4220,7 +4231,7 @@ begin
   if vpgRowHighlight in Options then
     begin
       AOldBrush := Canvas.Brush;
-      if FGanttFocused then
+      if Focused then
         ACanvas.Brush.Color := FRowHighlightColor
       else
         ACanvas.Brush.Color := cl3DShadow;

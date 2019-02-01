@@ -91,7 +91,7 @@ var
   GInterval: TvpInterval;
 begin
   GanttDiagram.BeginUpdate;
-  for i:=0 to 50 do
+  for i:=0 to 2 do
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
       GInterval.Name := 'Наряд №' + IntToStr(i) + ' от ' + DateToStr(Now-10+i);
