@@ -466,10 +466,11 @@ type
       procedure DeleteInterval(AnIndex: Integer);
       procedure RemoveInterval(AnInterval: TvpInterval);
       procedure UpdateInterval(AnIndex: Integer = -1);
-      procedure Clear;
 
+      procedure Clear;
       function GetStartDateOfBound: TDateTime;
       function GetEndDateOfBound: TDateTime;
+      procedure RecalcIntervals;
       procedure UpdateDates;
 
       procedure BeginUpdate;
@@ -1187,7 +1188,7 @@ begin
   curPos := GetScrollPos(Handle, SB_VERT);
   //если нижняя граница области рисования фокуса ниже низа клиентской области
   //то прокручиваем на ширину строки
-  if FvpGantt.FFocusRect.Bottom>ClientRect.Bottom then
+  if FvpGantt.FFocusRect.Bottom>ClientHeight then
     begin
       curPos := curPos + FvpGantt.RowHeight;
       //не должно быть > максимальногго диспазона прокрутки диапазон скрола - высота страницы скрола - 1
@@ -1204,7 +1205,6 @@ begin
     end;
   //шлем сообщение о прокрутке на нужную величину
   SendMessage(Handle, LM_VSCROLL, MakeWParam(SB_THUMBPOSITION, curPos), 0);
-
   {$ifdef DBGGANTTCALENDAR}
   Form1.El.Debug('FFocusRow %d  curPos %d  FFocusRect.Bottom %d ClientRect.Bottom %d FFocusRect.Top %d ClientRect.Top - FvpGantt.GetTitleHeight %d',
                  [FvpGantt.FFocusRow, curPos, FvpGantt.FFocusRect.Bottom, ClientRect.Bottom, FvpGantt.FFocusRect.Top, ClientRect.Top - FvpGantt.GetTitleHeight]);
@@ -3239,12 +3239,13 @@ begin
     VK_PRIOR:
       begin
         //кол-во видимых строк
-        DeltaRow := Ceil((ClientRect.Height - GetTitleHeight) / RowHeight);
+        DeltaRow := Ceil((ClientRect.Height - FScrollBarHeight - GetTitleHeight) / RowHeight);
         SelectNextRow(-DeltaRow);
+        {TODO -oVas: неправильно работает прокрутка постраничная}
       end;
     VK_NEXT:
       begin
-        DeltaRow := Ceil((ClientRect.Height - GetTitleHeight) / RowHeight);
+        DeltaRow := Ceil((ClientRect.Height - FScrollBarHeight - GetTitleHeight) / RowHeight);
         SelectNextRow(DeltaRow);
       end;
     VK_HOME:
@@ -3696,15 +3697,25 @@ procedure TvpGantt.UpdateBoundDates(AStartDate, AEndDate: TDate);
 var
   aSYear, aSMonth, aSDay: word;
   aEYear, aEMonth, aEDay: word;
+  oldStartBound, oldEndBound: TDateTime;
 begin
   {$ifdef DBGGANTT}
   Form1.EL.Debug('TvpGantt.UpdateIntervalDates %s %s', [DateToStr(AStartDate), DateToStr(AEndDate)]);
   {$endif}
-  //если текущая дата меньше устанавливаемой, то пересчитываем
+  oldStartBound := FStartDateOfBound;
+  oldEndBound := FEndDateOfBound;
+  //выбираем меньшую дату между занятой и устанавливаемой
   AStartDate := Min(AStartDate, StartDate);
+  //если уже период считали, то проверяем не получили ли мы диапазон уже, чем в прошлый раз
+  if FStartDateOfBound<>0 then
+    AStartDate := Min(AStartDate, FStartDateOfBound);
   DecodeDate(AStartDate, aSYear, aSMonth, aSDay);
   //а вдруг как-то передадим дату начала > даты окончания, не порядок
   AEndDate := Max(AEndDate, EndDate);
+  //если уже период считали, то проверяем не получили ли мы диапазон уже, чем в прошлый раз
+  if FEndDateOfBound<>0 then
+    AEndDate := Max(AEndDate, FEndDateOfBound);
+  //если полученный конец периода меньше начала, то непорядок
   if AEndDate<AStartDate then
     AEndDate := AStartDate;
   DecodeDate(AEndDate, aEYear, aEMonth, aEDay);
@@ -3764,9 +3775,14 @@ begin
         FEndDateOfBound := EndOfAYear(aEYear);
       end;
   end;
-  //пересчитываем значения календаря
-  if FvpGanttCalendar.HandleAllocated then
-    FvpGanttCalendar.CalcScaleCount;
+  //пересчитываем значения календаря, только если даты изменились
+  if (oldStartBound<>FStartDateOfBound) OR (oldEndBound<>FEndDateOfBound) then
+    begin
+      if FvpGanttCalendar.HandleAllocated then
+        FvpGanttCalendar.CalcScaleCount;
+      //и нужно пересчитатть по
+      RecalcIntervals;
+    end;
   {$ifdef DBGGANTT}
   Form1.Debug('Start date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', StartDate));
   Form1.Debug('End date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', EndDate));
@@ -3973,8 +3989,22 @@ begin
   //изменяются даты, пересчитаем только в случае если календарь создан
   if AnIndex>=0 then
     UpdateBoundDates(TvpInterval(FIntervals[AnIndex]).StartDate,
-                        TvpInterval(FIntervals[AnIndex]).FinishDate);
+                     TvpInterval(FIntervals[AnIndex]).FinishDate);
   VisualChange;
+end;
+
+procedure TvpGantt.RecalcIntervals;
+var
+  i:integer;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.RecalcIntervals');
+  {$endif}
+  BeginUpdate;
+  if IntervalCount>0 then
+    for i:=0 to IntervalCount-1 do
+      TvpInterval(FIntervals[i]).UpdateBounds;
+  EndUpdate();
 end;
 
 procedure TvpGantt.Clear;
