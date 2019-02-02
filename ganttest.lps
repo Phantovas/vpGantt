@@ -19,8 +19,8 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="Unit1"/>
-        <TopLine Value="31"/>
-        <CursorPos X="15" Y="48"/>
+        <TopLine Value="78"/>
+        <CursorPos X="16" Y="97"/>
         <UsageCount Value="200"/>
         <Loaded Value="True"/>
       </Unit1>
@@ -37,9 +37,9 @@
         <Filename Value="units\vpgantt.pas"/>
         <UnitName Value="vpGantt"/>
         <IsVisibleTab Value="True"/>
-        <EditorIndex Value="4"/>
-        <TopLine Value="3143"/>
-        <CursorPos X="8" Y="3149"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="52"/>
+        <CursorPos X="29" Y="70"/>
         <ExtraEditorCount Value="1"/>
         <ExtraEditor1>
           <EditorIndex Value="-1"/>
@@ -50,20 +50,21 @@
         <Loaded Value="True"/>
       </Unit3>
       <Unit4>
-        <Filename Value="C:\lazarus\lcl\controls.pp"/>
+        <Filename Value="C:\Lazarus\lcl\controls.pp"/>
         <UnitName Value="Controls"/>
         <EditorIndex Value="2"/>
-        <TopLine Value="1936"/>
-        <CursorPos X="14" Y="1954"/>
-        <UsageCount Value="14"/>
+        <TopLine Value="1917"/>
+        <CursorPos X="15" Y="1933"/>
+        <UsageCount Value="15"/>
         <Loaded Value="True"/>
       </Unit4>
       <Unit5>
-        <Filename Value="C:\lazarus\lcl\include\wincontrol.inc"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="6073"/>
-        <CursorPos Y="6080"/>
+        <Filename Value="C:\Lazarus\lcl\include\wincontrol.inc"/>
+        <EditorIndex Value="3"/>
+        <TopLine Value="6270"/>
+        <CursorPos X="3" Y="6275"/>
         <UsageCount Value="27"/>
+        <Loaded Value="True"/>
       </Unit5>
       <Unit6>
         <Filename Value="C:\Lazarus\lcl\widgetset\wscontrols.pp"/>
@@ -89,13 +90,12 @@
         <UsageCount Value="4"/>
       </Unit8>
       <Unit9>
-        <Filename Value="C:\lazarus\lcl\grids.pas"/>
+        <Filename Value="C:\Lazarus\lcl\grids.pas"/>
         <UnitName Value="Grids"/>
-        <EditorIndex Value="1"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="4645"/>
         <CursorPos Y="4660"/>
         <UsageCount Value="39"/>
-        <Loaded Value="True"/>
       </Unit9>
       <Unit10>
         <Filename Value="C:\lazarus\lcl\interfaces\win32\win32wscontrols.pp"/>
@@ -207,10 +207,10 @@
         <UsageCount Value="16"/>
       </Unit24>
       <Unit25>
-        <Filename Value="C:\lazarus\lcl\include\control.inc"/>
+        <Filename Value="C:\Lazarus\lcl\include\control.inc"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="2108"/>
-        <CursorPos Y="2125"/>
+        <TopLine Value="4889"/>
+        <CursorPos X="3" Y="4883"/>
         <UsageCount Value="19"/>
       </Unit25>
       <Unit26>
@@ -324,11 +324,12 @@
         <UsageCount Value="10"/>
       </Unit40>
       <Unit41>
-        <Filename Value="C:\lazarus\lcl\include\customcontrol.inc"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="70"/>
-        <CursorPos X="3" Y="78"/>
-        <UsageCount Value="5"/>
+        <Filename Value="C:\Lazarus\lcl\include\customcontrol.inc"/>
+        <EditorIndex Value="4"/>
+        <TopLine Value="15"/>
+        <CursorPos X="3" Y="24"/>
+        <UsageCount Value="10"/>
+        <Loaded Value="True"/>
       </Unit41>
       <Unit42>
         <Filename Value="C:\lazarus\lcl\extctrls.pp"/>
@@ -339,12 +340,11 @@
         <UsageCount Value="4"/>
       </Unit42>
       <Unit43>
-        <Filename Value="C:\lazarus\lcl\include\winapih.inc"/>
-        <EditorIndex Value="3"/>
+        <Filename Value="C:\Lazarus\lcl\include\winapih.inc"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="107"/>
         <CursorPos X="10" Y="125"/>
         <UsageCount Value="12"/>
-        <Loaded Value="True"/>
       </Unit43>
       <Unit44>
         <Filename Value="C:\lazarus\lcl\lcltype.pp"/>
@@ -522,123 +522,123 @@
     <JumpHistory Count="30" HistoryIndex="29">
       <Position1>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3563" Column="61" TopLine="3545"/>
+        <Caret Line="2802" Column="12" TopLine="2774"/>
       </Position1>
       <Position2>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="4156" Column="6" TopLine="4138"/>
+        <Caret Line="3127" Column="20" TopLine="3099"/>
       </Position2>
       <Position3>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="4202" Column="37" TopLine="4182"/>
+        <Caret Line="3633" Column="26" TopLine="3605"/>
       </Position3>
       <Position4>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="475" TopLine="458"/>
+        <Caret Line="1918" Column="16" TopLine="1901"/>
       </Position4>
       <Position5>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="305" TopLine="290"/>
+        <Caret Line="1935" TopLine="1924"/>
       </Position5>
       <Position6>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="2003" Column="13" TopLine="1998"/>
+        <Caret Line="2658" Column="24" TopLine="2641"/>
       </Position6>
       <Position7>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="197" Column="3" TopLine="197"/>
+        <Caret Line="834" Column="17" TopLine="822"/>
       </Position7>
       <Position8>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="231" TopLine="215"/>
+        <Caret Line="1222" Column="33" TopLine="1218"/>
       </Position8>
       <Position9>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="253" Column="3" TopLine="235"/>
+        <Caret Line="1538" Column="24" TopLine="1526"/>
       </Position9>
       <Position10>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="1997" TopLine="1943"/>
+        <Caret Line="1450" Column="18" TopLine="1439"/>
       </Position10>
       <Position11>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3562" TopLine="3555"/>
+        <Caret Line="1410" Column="22" TopLine="1401"/>
       </Position11>
       <Position12>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3567" TopLine="3543"/>
+        <Caret Line="834" Column="17" TopLine="819"/>
       </Position12>
       <Position13>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3560" TopLine="3543"/>
+        <Caret Line="1488" Column="22" TopLine="1473"/>
       </Position13>
       <Position14>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3562" TopLine="3543"/>
+        <Caret Line="1538" Column="24" TopLine="1526"/>
       </Position14>
       <Position15>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3563" TopLine="3543"/>
+        <Caret Line="1460" Column="24" TopLine="1449"/>
       </Position15>
       <Position16>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3565" TopLine="3543"/>
+        <Caret Line="834" Column="17" TopLine="822"/>
       </Position16>
       <Position17>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3566" TopLine="3543"/>
+        <Caret Line="1460" Column="24" TopLine="1448"/>
       </Position17>
       <Position18>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3567" TopLine="3543"/>
+        <Caret Line="1538" Column="24" TopLine="1526"/>
       </Position18>
       <Position19>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3560" Column="15" TopLine="3543"/>
+        <Caret Line="1607" TopLine="1596"/>
       </Position19>
       <Position20>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3562" Column="14" TopLine="3543"/>
+        <Caret Line="1637" Column="24" TopLine="1626"/>
       </Position20>
       <Position21>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="48" TopLine="37"/>
+        <Caret Line="1950" Column="32" TopLine="1938"/>
       </Position21>
       <Position22>
-        <Filename Value="C:\lazarus\lcl\grids.pas"/>
-        <Caret Line="7635" Column="37" TopLine="7630"/>
+        <Filename Value="units\vpgantt.pas"/>
+        <Caret Line="2288" Column="35" TopLine="2284"/>
       </Position22>
       <Position23>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3571" Column="27" TopLine="3556"/>
+        <Caret Line="2370" Column="40" TopLine="2377"/>
       </Position23>
       <Position24>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="416" Column="24" TopLine="399"/>
+        <Caret Line="2557" Column="24" TopLine="2545"/>
       </Position24>
       <Position25>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3447" TopLine="3436"/>
+        <Caret Line="2574" Column="24" TopLine="2562"/>
       </Position25>
       <Position26>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="440" Column="32" TopLine="423"/>
+        <Caret Line="2651" Column="18" TopLine="2639"/>
       </Position26>
       <Position27>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3439" Column="9" TopLine="3422"/>
+        <Caret Line="2661" Column="24" TopLine="2649"/>
       </Position27>
       <Position28>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3440" Column="74" TopLine="3421"/>
+        <Caret Line="3184" Column="3" TopLine="3190"/>
       </Position28>
       <Position29>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="3439" Column="121" TopLine="3421"/>
+        <Caret Line="413" Column="33" TopLine="403"/>
       </Position29>
       <Position30>
         <Filename Value="units\vpgantt.pas"/>
-        <Caret Line="393" Column="17" TopLine="377"/>
+        <Caret Line="3702" TopLine="3684"/>
       </Position30>
     </JumpHistory>
   </ProjectSession>
