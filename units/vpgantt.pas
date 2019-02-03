@@ -82,7 +82,8 @@ type
                 vpgVertLine,                  //вертикальный бордюр в сетке
                 vpgHorzLine,                  //горизонтальный бордюр в сетке
                 vpgExtendVertLines,           //вертикальные разделители в высоту компонента
-                vpgRowHint                    //всплывающие подсказки для каждой строки
+                vpgRowHint,                   //всплывающие подсказки для каждой строки
+                vpgTitleTextNoScroll          //всегда показывать надписи в заголовках
                 );
 
   TvpGanttOptions = set of TvpgOption;
@@ -121,7 +122,8 @@ const
                          vpgRowHighlight,
                          vpgHorzLine,
                          vpgVertLine,
-                         vpgRowHint
+                         vpgRowHint,
+                         vpgTitleTextNoScroll
                         ];
 
 resourcestring
@@ -2125,6 +2127,7 @@ begin
   {$endif}
   inherited create(AOwner);
   Parent := AOwner;
+
   FHScrollPosition := 0;
 
   FMajorScale := vptsMonth;
@@ -4292,8 +4295,9 @@ var
   aTextStyle: TTextStyle;
   textRect: TRect;
   aBrushStyle: TBrushStyle;
+  textWidth: integer;
 begin
-  {TODO: -o Vas Попробовать сделать для первого диапазона не прокручивающуюся надпись  }
+  {DONE: -o Vas Попробовать сделать для первого диапазона не прокручивающуюся надпись  }
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.DrawTitleText');
   {$endif}
@@ -4302,7 +4306,17 @@ begin
   ACanvas.Brush.Style := bsClear;
   aTextStyle := FTitleTextStyle;
   aTextStyle.Alignment := aAligment;
-  textRect := Rect(aRect.Left + C_TITLE_TEXT_INDENT, aRect.Top, aRect.Right - C_TITLE_TEXT_INDENT, aRect.Bottom);
+  textRect := TRect.Create(aRect.Left + C_TITLE_TEXT_INDENT, aRect.Top, aRect.Right - C_TITLE_TEXT_INDENT, aRect.Bottom);
+  //если не прокручивать надписи в заголовке, то надо вычислить область текста
+  //относительно области рисования, а она у нас ClientRect
+  if (vpgTitleTextNoScroll in Options) AND (textRect.Left<ClientRect.Left) then
+    begin
+      textWidth := Canvas.TextWidth(aText) + 2*C_TITLE_TEXT_INDENT;
+      textRect.Left := ClientRect.Left + C_TITLE_TEXT_INDENT;
+      if textRect.Width<textWidth then
+        textRect.Left := textRect.Left - (textWidth - textRect.Width);
+    end;
+  //выводим текст
   ACanvas.TextRect(textRect, textRect.Left, textRect.Top, aText, aTextStyle);
   ACanvas.Brush.Style := aBrushStyle;
 end;
