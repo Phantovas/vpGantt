@@ -16,7 +16,7 @@
   @Author: Vasiliy Ponomarjov
   @Email: phantovas@gmail.com
   @created: 06-JAN-2019
-  @modified: 01-FEB-2019
+  @modified: 04-FEB-2019
   @version: migrate to 0.4a
 
 /******************************************************************************/
@@ -36,8 +36,9 @@
   4. Сделать сортировку по датам
 }
 
-
 unit vpGantt;
+
+{$mode ObjFPC}
 
 //{$define DBGINTERVAL}
 //{$define DBGGANTT}
@@ -88,30 +89,18 @@ type
 
   TvpGanttOptions = set of TvpgOption;
 
-  //vptsMinute - минуты,
-  //vptsDecMinute - десятки минут (10..60),
-  //vptsHour - часы,
-  //vptsDay - дни,
-  //vptsDayWeek - дни недели,
-  //vptsWeek - недели (дата.год),
-  //vptsWeekNum - номер недели,
-  //vptsWeekNumPlain - название недели,
-  //vptsMonth - месяцы,
-  //vptsQuarter - кварталы,
-  //vptsHalfYear - полугодие,
-  //vptsYear - год
-  TvpTimeScale = (vptsMinute,
-                  vptsDecMinute,
-                  vptsHour,
-                  vptsDay,
-                  vptsDayWeek,
-                  vptsWeek,
-                  vptsWeekNum,
-                  vptsWeekNumPlain,
-                  vptsMonth,
-                  vptsQuarter,
-                  vptsHalfYear,
-                  vptsYear);
+  TvpTimeScale = (vptsMinute,                 //vptsMinute - минуты,
+                  vptsDecMinute,              //vptsDecMinute - десятки минут (10..60),
+                  vptsHour,                   //vptsHour - часы,
+                  vptsDay,                    //vptsDay - дни,
+                  vptsDayWeek,                //vptsDayWeek - дни недели,
+                  vptsWeek,                   //vptsWeek - недели (дата.год),
+                  vptsWeekNum,                //vptsWeekNum - номер недели,
+                  vptsWeekNumPlain,           //vptsWeekNumPlain - название недели,
+                  vptsMonth,                  //vptsMonth - месяцы,
+                  vptsQuarter,                //vptsQuarter - кварталы,
+                  vptsHalfYear,               //vptsHalfYear - полугодие,
+                  vptsYear);                  //vptsYear - год
 
 const
   constCellPadding: byte = 3;
@@ -371,7 +360,7 @@ type
       FTitleTextStyle: TTextStyle;
       FFocusRow: integer;
       //methods
-      procedure ClearDates;
+      procedure ClearBoundDates;
       function GetCalendarColor: TColor;
       function GetIntervalCount: Integer;
       function GetInterval(AnIndex: Integer): TvpInterval;
@@ -538,9 +527,9 @@ type
 
 implementation
 
+{$if Defined(DBGGANTT) OR Defined(DBGGANTTTASKS) OR Defined(DBGGANTTCALENDAR)}
 uses Unit1;
 
-{$if Defined(DBGGANTT) OR Defined(DBGGANTTTASKS) OR Defined(DBGGANTTCALENDAR)}
 function SbToStr(Which: Integer): string;
 begin
   case Which of
@@ -1745,8 +1734,8 @@ function TvpGanttCalendar.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.DoMouseWheel');
-  {$endif}
   Form1.ShowParam(IntToStr(WheelDelta));
+  {$endif}
   Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
 end;
 
@@ -2258,8 +2247,8 @@ function TvpGanttTasks.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.DoMouseWheel');
-  {$endif}
   Form1.ShowParam(IntToStr(WheelDelta));
+  {$endif}
   Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
 end;
 
@@ -2746,13 +2735,13 @@ end;
 
 { TvpGantt }
 
-procedure TvpGantt.ClearDates;
+procedure TvpGantt.ClearBoundDates;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.ClearDates');
   {$EndIf}
-  FStartDate := 0;
-  FEndDate := 0;
+  FStartDateOfBound := 0;
+  FEndDateOfBound := 0;
 end;
 
 function TvpGantt.GetCalendarColor: TColor;
@@ -2956,6 +2945,8 @@ begin
   else
     begin
       FvpGanttCalendar.FMajorScale := AValue;
+      //обнуляем шкалу для правильного пересчета
+      ClearBoundDates;
       UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
@@ -2977,6 +2968,8 @@ begin
   else
     begin
       FvpGanttCalendar.FMinorScale := AValue;
+      //обнуляем шкалу для правильного пересчета
+      ClearBoundDates;
       UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
@@ -3845,14 +3838,13 @@ begin
         FEndDateOfBound := EndOfAYear(aEYear);
       end;
   end;
-  //пересчитываем значения календаря, только если даты изменились
-  if (oldStartBound<>FStartDateOfBound) OR (oldEndBound<>FEndDateOfBound) then
-    begin
-      if FvpGanttCalendar.HandleAllocated then
-        FvpGanttCalendar.CalcScaleCount;
-      //и нужно пересчитатть по
-      RecalcIntervals;
-    end;
+  //пересчитываем значения календаря
+  //хорошо было бы пересчитывать только если даты изменились, но при смене типа шкал тоже пересчитать надо,
+  //а даты при этом не меняются :(
+  if FvpGanttCalendar.HandleAllocated then
+    FvpGanttCalendar.CalcScaleCount;
+  //и нужно пересчитать интервалы
+  RecalcIntervals;
   {$ifdef DBGGANTT}
   Form1.Debug('Start date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', StartDate));
   Form1.Debug('End date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', EndDate));

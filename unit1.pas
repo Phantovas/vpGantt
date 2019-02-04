@@ -52,6 +52,7 @@ type
 var
   Form1: TForm1;
   GanttDiagram: TvpGantt;
+  current: integer;
   //GC: TgsGantt;
 
 implementation
@@ -91,7 +92,7 @@ var
   GInterval: TvpInterval;
 begin
   GanttDiagram.BeginUpdate;
-  for i:=0 to 2000 do
+  for i:=current to current+10 do
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
       GInterval.Name := 'Наряд №' + IntToStr(i) + ' от ' + DateToStr(Now-10+i);
@@ -108,8 +109,8 @@ begin
       //GInterval.Visible := True;
       GanttDiagram.AddInterval(GInterval);
     end;
-  GanttDiagram.First;
   GanttDiagram.EndUpdate();
+  current := i+1;
 end;
 
 procedure TForm1.Button3Click(Sender: TObject);
@@ -143,6 +144,7 @@ end;
 procedure TForm1.FormShow(Sender: TObject);
 begin
   EL.Active := True;
+  current := 0;
 
   GanttDiagram := TvpGantt.Create(Self);
   GanttDiagram.Parent := Panel3;
@@ -150,8 +152,8 @@ begin
   GanttDiagram.ScrollBars := ssAutoBoth;
   GanttDiagram.BorderStyle := bsSingle;
   GanttDiagram.TaskTitleCaption := 'Наряды';
-  GanttDiagram.MajorScale := vptsMonth;
-  GanttDiagram.MinorScale := vptsDay;
+  GanttDiagram.MinorScale := vptsDecMinute;
+  GanttDiagram.MajorScale := vptsHour;
   GanttDiagram.TitleStyle := tsNative;
   GanttDiagram.GridBorderWidth := 1;
   GanttDiagram.Hint := 'Это стандартный скрипт';
