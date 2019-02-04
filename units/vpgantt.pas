@@ -1182,14 +1182,15 @@ end;
 
 procedure TvpGanttCalendar.ScrollToFocus;
 var
-  curPos: integer;
+  oldPos, curPos: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.ScrollToFocusRect');
   {$EndIf}
   curPos := GetScrollPos(Handle, SB_VERT);
+  oldPos := curPos;
   //если нижняя граница области рисования фокуса ниже низа клиентской области
-  //то прокручиваем на ширину строки
+  //то прокручиваем на разницу между грfницами фокуса
   if TvpGantt(Parent).FFocusRect.Bottom>ClientHeight then
     begin
       curPos := curPos + TvpGantt(Parent).FFocusRect.Bottom - ClientRect.Bottom;
@@ -1201,12 +1202,22 @@ begin
   else if TvpGantt(Parent).FFocusRect.Top<FGridVisibleRect.Top then
     begin
       curPos := curPos + TvpGantt(Parent).FFocusRect.Top - FGridVisibleRect.Top;
-      //не должно быть отрицательным, т.е. если сдвинуты на пол строки и дошли до последней, то крутатнуть надо до 0,
+      //не должно быть отрицательным, т.е. если сдвинуты на пол строки и дошли до первой, то крутатнуть надо до 0,
       //а никак не в отрицательную позицию
       curPos := Max(0, curPos);
     end;
-  //шлем сообщение о прокрутке на нужную величину
-  SendMessage(Handle, LM_VSCROLL, MakeWParam(SB_THUMBPOSITION, curPos), 0);
+  //если позиция ползунка изменилась, то перерисовываем все
+  //иначе перерисовываем только фокус
+  if curPos<>oldPos then
+    begin
+      ScrollBarPosition(SB_VERT, curPos);
+      TvpGantt(Parent).FVScrollPosition := curPos;
+      TvpGantt(Parent).Invalidate;
+    end
+  else
+    TvpGantt(Parent).InvalidateFocused;
+  //убираем сообщение, т.к. в этом случае мы не можем переслать позицию указателя выше 65535 :(
+  //SendMessage(Handle, LM_VSCROLL, MakeWParam(SB_THUMBPOSITION, curPos), 0);
   {$ifdef DBGGANTTCALENDAR}
   Form1.El.Debug('FFocusRow %d  curPos %d  FFocusRect.Bottom %d ClientRect.Bottom %d FFocusRect.Top %d ClientRect.Top - FvpGantt.GetTitleHeight %d',
                  [FvpGantt.FFocusRow, curPos, FvpGantt.FFocusRect.Bottom, ClientRect.Bottom, FvpGantt.FFocusRect.Top, ClientRect.Top - FvpGantt.GetTitleHeight]);
@@ -3677,11 +3688,14 @@ begin
   if AValue>IntervalCount-1 then
     raise Exception.Create(RS_E_LIST_INDEX_OUT_OF_BOUNDS)
   else
-    FFocusRow := AValue;
-  //рассчитали новую область фокуса
-  CalcFocusRect;
-  if (FUpdateCount=0) AND (FvpGanttCalendar.HandleAllocated) then
-    FvpGanttCalendar.ScrollToFocus;
+    begin
+      //стираем текущий фокус
+      InvalidateFocused;
+      FFocusRow := AValue;
+      CalcFocusRect;
+      if (FUpdateCount=0) AND (FvpGanttCalendar.HandleAllocated) then
+        FvpGanttCalendar.ScrollToFocus;
+    end;
 end;
 
 procedure TvpGantt.SelectNextRow(const ADelta: integer);

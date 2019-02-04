@@ -91,12 +91,11 @@ var
   GInterval: TvpInterval;
 begin
   GanttDiagram.BeginUpdate;
-  for i:=0 to 50 do
+  for i:=0 to 2000 do
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
       GInterval.Name := 'Наряд №' + IntToStr(i) + ' от ' + DateToStr(Now-10+i);
       GInterval.StartDate := Now - 4 + i;
-      Memo1.Lines.Add(DatetImeToStr(GInterval.StartDate));
       GInterval.Duration := 10;
       if i = 4 then
         GInterval.FinishDate := GInterval.StartDate + 4;
