@@ -66,7 +66,7 @@ const
   C_VPGANTT_WIDTH = 300;
   C_VPGANTT_HEIGHT = 150;
   C_TITLE_TEXT_INDENT = 3;
-  C_ROW_HIGHLITE_VALUE = 50;
+  C_ROW_HIGHLIGHT_VALUE = 50;
   C_DEF_INTERVAL_PADDING = 3;
   C_DEF_INTERVAL_RADIUS = 3;
 
@@ -520,7 +520,7 @@ type
       property TitleColor: TColor read FTitleColor write SetTitleColor default clBtnFace;
       property TaskTitleCaption: TCaption read GetTaskTitleCaption write SetTaskTitleCaption;
       property PlanIntervalColor: TColor read FPlanIntervalColor write SetPlanIntervalColor default clSkyBlue;
-      property FactIntervalColor: TColor read FFactIntervalColor write SetFactIntervalColor default clBlue;
+      property FactIntervalColor: TColor read FFactIntervalColor write SetFactIntervalColor;
       property FreeIntervalColor: TColor read FFreeIntervalColor write SetFreeIntervalColor default clLime;
       property ExpiredIntervalColor: TColor read FExpiredIntervalColor write SetExpiredIntervalColor default clRed;
   end;
@@ -1794,6 +1794,11 @@ begin
   //берем нулевую область для старта
   aRect := Rect(0, 0, 0, TvpGantt(Parent).MajorScaleHeight);
   aRect.Offset( - FHScrollPosition, 0);
+  //шрифт
+  if not TvpGantt(Parent).FTitleFontIsDefault then
+    Canvas.Font.Assign(TvpGantt(Parent).TitleFont)
+  else
+    Canvas.Font := Font;
   //перебираем все мажорные диапазоны
   for i:=0 to FMajorScaleCount-1 do
     begin
@@ -1828,6 +1833,11 @@ begin
   aRect := Rect(0, TvpGantt(Parent).MajorScaleHeight,
                 GetMinorScaleWidth, TvpGantt(Parent).MajorScaleHeight + TvpGantt(Parent).MinorScaleHeight);
   aRect.Offset( - FHScrollPosition, 0);
+  //шрифт
+  if not TvpGantt(Parent).FTitleFontIsDefault then
+    Canvas.Font.Assign(TvpGantt(Parent).TitleFont)
+  else
+    Canvas.Font := Font;
   //перебираем все мажорные диапазоны
   for i:=0 to FMinorScaleCount-1 do
     begin
@@ -1924,6 +1934,8 @@ begin
   rowRect := CalcRowRect(aRow);
   aMinorScaleWidth := GetMinorScaleWidth;
   Dv := vpgVertLine in TvpGantt(Parent).Options;
+  //шрифт
+  Canvas.Font := Font;
   {$ifdef DBGSCROLL}
   Form1.EL.Debug('Calendar rRect.Left %d rRect.Top %d rRect.Right %d rRect.Bottom %d',
                   [rowRect.Left, rowRect.Top, rowRect.Right, rowRect.Bottom]);
@@ -1939,7 +1951,7 @@ begin
       for i:=0 to FMinorScaleCount - 1 do
         begin
           //устанавливаем размер области = размеру области строки
-          cellRect := rowRect;
+          cellRect := TRect.Create(rowRect);
           //вычисляем с учетом сдвига, ширина будет равна FPixelePerMinorScale;
           cellRect.Left := aMinorScaleWidth * i - FHScrollPosition;
           cellRect.Right := cellRect.Left + aMinorScaleWidth;
@@ -1954,7 +1966,6 @@ begin
           if tmpRect.Width>0 then
             begin
               TvpGantt(Parent).DrawCellGrid(Canvas, cellRect);
-              Canvas.Font := Font;
               Canvas.Brush.Color := FColor;
               if Dv AND ([vpgMajorVertLine, vpgMinorVertLine]*TvpGantt(Parent).Options=[]) then
                 TvpGantt(Parent).CutVBorderFromRect(cellRect);
@@ -2371,6 +2382,8 @@ begin
   //область строки
   rowRect := CalcRowRect(aRow);
   cellRect := TRect.Create(0, 0, 0, 0);
+  //шрифт
+  Canvas.Font := Font;
   {$ifdef DBGGANTTTASKS}
   Form1.EL.Debug('Row rect Left %d Top %d Right %d Bottom %d',
                   [rowRect.Left, rowRect.Top, rowRect.Right, rowRect.Bottom]);
@@ -2385,7 +2398,6 @@ begin
       //бордюр
       TvpGantt(Parent).DrawCellGrid(Canvas, rowRect);
       //цвета
-      Canvas.Font := Font;
       Canvas.Brush.Color := FColor;
       //ячейка cellRect пока не рубим, будем рисовать несколько ячеек и оно нам пригодится
       CopyRect(cellRect, rowRect);
@@ -2413,12 +2425,12 @@ begin
   {$endif}
   titRect := GetTitleRect;
   titCaption := PChar(TvpGantt(Parent).TaskTitleCaption);
-  if Assigned(Parent) then
+  if not TvpGantt(Parent).FTitleFontIsDefault then
     Canvas.Font.Assign(TvpGantt(Parent).TitleFont)
   else
     Canvas.Font := Font;
   TvpGantt(Parent).DrawTitleCell(Canvas, titRect);
-  TvpGantt(Parent).DrawTitleText(Canvas, titRect, titCaption, taCenter);
+  TvpGantt(Parent).DrawTitleText(Canvas, titRect, titCaption);
 end;
 
 procedure TvpGanttTasks.GetSBVisibility(out HsbVisible: boolean);
@@ -3901,10 +3913,10 @@ begin
   CalendarColor := clWindow;
   BorderColor := clActiveBorder;
   ScrollBars := ssAutoBoth;
-  FRowHighlightColor :=  GetHighLightColor(clHighlight, C_ROW_HIGHLITE_VALUE);
+  FRowHighlightColor :=  GetHighLightColor(clHighlight, C_ROW_HIGHLIGHT_VALUE);
 
   FPlanIntervalColor := clSkyBlue;
-  FFactIntervalColor := clBlue;
+  FFactIntervalColor := GetShadowColor(clHighlight, -C_ROW_HIGHLIGHT_VALUE);
   FFreeIntervalColor := clLime;
   FExpiredIntervalColor := clRed;
 
@@ -3914,7 +3926,6 @@ begin
 
   FTitleFont := TFont.Create;
   FTitleFont.OnChange := @OnTitleFontChanged;
-  FTitleFont.Style := [fsBold];
   FTitleFontIsDefault := True;
   with FTitleTextStyle do
     begin
