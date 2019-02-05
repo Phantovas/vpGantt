@@ -255,8 +255,11 @@ begin
 end;
 
 procedure TForm1.DblClick(Sender: TObject);
+var
+  curIndex: integer;
 begin
-  ShowMessage('DblClick');
+  curIndex := GanttDiagram.SelectedIndex;
+  Memo1.Lines.Add(IntToStr(curIndex));
 end;
 
 end.

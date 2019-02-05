@@ -389,8 +389,6 @@ type
       procedure SetMajorScaleHeight(AValue: integer);
       procedure SetMinorScale(AValue: TvpTimeScale);
       procedure SetMinorScaleHeight(AValue: integer);
-      procedure SetOnClick(AValue: TNotifyEvent);
-      procedure SetOnDblClick(AValue: TNotifyEvent);
       procedure SetOptions(AValue: TvpGanttOptions);
       procedure SetPixelPerMinorScale(AValue: integer);
       procedure SetPlanIntervalColor(AValue: TColor);
@@ -415,6 +413,8 @@ type
       procedure CutBorderFromRect(var aRect: TRect);
       procedure CutHBorderFromRect(var aRect: TRect);
       procedure CutVBorderFromRect(var aRect: TRect);
+      procedure DoClick(Sender: TObject);
+      procedure DoDblClick(Sender: TObject);
       procedure DrawCellGrid(ACanvas: TCanvas; const aRect: TRect);
       procedure DrawCell(aRow: integer; ACanvas: TCanvas; const aRect: TRect);
       procedure DrawFocusRect(ACanvas: TCanvas; const aRect: TRect);
@@ -484,6 +484,8 @@ type
       property BorderStyle;
       property BorderWidth;
       //events
+      property OnClick;
+      property OnDblClick;
       property OnResize;
       property OnKeyDown;
       property OnKeyPress;
@@ -491,8 +493,6 @@ type
       property OnMouseDown;
       property OnMouseMove;
       property OnMouseUp;
-      property OnClick: TNotifyEvent read FOnClick write SetOnClick;
-      property OnDblClick: TNotifyEvent read FOnDblClick write SetOnDblClick;
       //custom property
       property BorderColor: TColor read FBorderColor write SetBorderColor default clActiveBorder;
       property EndDate: TDate read FEndDate write SetEndDate;
@@ -1735,6 +1735,7 @@ begin
   Canvas.FillRect(ClientRect);
 end;
 
+
 function TvpGanttCalendar.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
   MousePos: TPoint): Boolean;
 begin
@@ -2826,6 +2827,19 @@ begin
   aRect.Right := aRect.Right - GetVertBorderWidth;
 end;
 
+procedure TvpGantt.DoClick(Sender: TObject);
+begin
+  if Assigned(OnClick) then
+    OnClick(Self);
+end;
+
+procedure TvpGantt.DoDblClick(Sender: TObject);
+begin
+  if Assigned(OnDblClick) then
+    OnDblClick(Self);
+end;
+
+
 function TvpGantt.GetIntervalsHeight: integer;
 begin
   {$ifdef DBGGANTT}
@@ -3019,26 +3033,6 @@ begin
     Exit;
   FMinorScaleHeight := AValue;
   VisualChange;
-end;
-
-procedure TvpGantt.SetOnClick(AValue: TNotifyEvent);
-begin
-  if FOnClick = AValue then Exit;
-  FOnClick := AValue;
-  if FvpGanttCalendar.HandleAllocated then
-    FvpGanttCalendar.OnClick := FOnClick;
-  if FvpGanttTasks.HandleAllocated then
-    FvpGanttTasks.OnClick := FOnClick;
-end;
-
-procedure TvpGantt.SetOnDblClick(AValue: TNotifyEvent);
-begin
-  if FOnDblClick = AValue then Exit;
-  FOnDblClick := AValue;
-  if FvpGanttCalendar.HandleAllocated then
-    FvpGanttCalendar.OnDblClick := FOnDblClick;
-  if FvpGanttTasks.HandleAllocated then
-    FvpGanttTasks.OnDblClick := FOnDblClick;
 end;
 
 procedure TvpGantt.SetOptions(AValue: TvpGanttOptions);
@@ -3934,6 +3928,8 @@ begin
   FvpGanttTasks := TvpGanttTasks.Create(Self);
   FvpGanttTasks.Width := C_DEF_TASKS_WIDTH;
   FvpGanttTasks.Align := alLeft;
+  FvpGanttTasks.OnClick := @DoClick;
+  FvpGanttTasks.OnDblClick := @DoDblClick;
 
   //create splitter
   FSplitter := TSplitter.Create(Self);
@@ -3946,6 +3942,8 @@ begin
   //create vpGanttTasks
   FvpGanttCalendar := TvpGanttCalendar.Create(Self);
   FvpGanttCalendar.Align := alClient;
+  FvpGanttCalendar.OnClick := @DoClick;
+  FvpGanttCalendar.OnDblClick := @DoDblClick;
 
   BeginUpdate;
 
