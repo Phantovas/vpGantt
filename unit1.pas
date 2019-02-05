@@ -152,8 +152,8 @@ begin
   GanttDiagram.ScrollBars := ssAutoBoth;
   GanttDiagram.BorderStyle := bsSingle;
   GanttDiagram.TaskTitleCaption := 'Наряды';
-  GanttDiagram.MinorScale := vptsDecMinute;
-  GanttDiagram.MajorScale := vptsHour;
+  GanttDiagram.MinorScale := vptsDay;
+  GanttDiagram.MajorScale := vptsMonth;
   GanttDiagram.TitleStyle := tsNative;
   GanttDiagram.GridBorderWidth := 1;
   GanttDiagram.Hint := 'Это стандартный скрипт';

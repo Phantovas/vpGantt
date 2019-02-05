@@ -149,10 +149,12 @@ type
     FFinishDate: TDateTime;
     FStartDate: TDateTime;
     FDuration: Double;
+    FTag: integer;
   public
-    property Name : string read FName write FName;
-    property Project : string read FProject write FProject;
-    property Resource : string read FResource write FResource;
+    property Name: string read FName write FName;
+    property Project: string read FProject write FProject;
+    property Resource: string read FResource write FResource;
+    property Tag: integer read FTag write FTag;
   end;
 
   { TvpInterval }
@@ -367,7 +369,7 @@ type
       function GetBorderWidth: integer;
       function GetHorzBorderWidth: integer;
       function GetVertBorderWidth: integer;
-      function GetIntervalIndex: integer;
+      function GetSelectedIndex: integer;
       function GetMajorScale: TvpTimeScale;
       function GetMinorScale: TvpTimeScale;
       function GetPixelPerMinorScale: integer;
@@ -449,7 +451,7 @@ type
       destructor Destroy; override;
       //property
       property Interval[Index: Integer]: TvpInterval read GetInterval;
-      property IntervalIndex: integer read GetIntervalIndex;
+      property SelectedIndex: integer read GetSelectedIndex;
       property IntervalCount: Integer read GetIntervalCount;
       procedure AddInterval(AnInterval: TvpInterval);
       procedure InsertInterval(AnIndex: Integer; AnInterval: TvpInterval);
@@ -3501,7 +3503,7 @@ begin
     Result := 0;
 end;
 
-function TvpGantt.GetIntervalIndex: integer;
+function TvpGantt.GetSelectedIndex: integer;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.GetIntervalIndex');
