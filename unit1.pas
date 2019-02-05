@@ -36,6 +36,7 @@ type
     procedure ChBStyleChange(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormShow(Sender: TObject);
+    procedure Panel2Click(Sender: TObject);
   private
     { private declarations }
     procedure LogBoundsRect(Control: TControl);
@@ -43,6 +44,8 @@ type
     procedure MDown(Sender: Tobject; Button: TMouseButton; Shift:TShiftState; X,Y:Integer);
     procedure MMove(Sender: Tobject; Shift:TShiftState; X,Y:Integer);
     procedure MUp(Sender: Tobject; Button: TMouseButton; Shift:TShiftState; X,Y:Integer);
+    procedure Click(Sender: TObject);
+    procedure DblClick(Sender: TObject);
   public
     { public declarations }
     procedure Debug(AMessage: string; AShowMessage: boolean = false);
@@ -159,9 +162,13 @@ begin
   GanttDiagram.Hint := 'Это стандартный скрипт';
   //Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   GanttDiagram.SetFocus;
-  //GanttDiagram.OnMouseDown := @MDown;
-  //GanttDiagram.OnMouseMove := @MMove;
-  //GanttDiagram.OnMouseUp := @MUp;
+  GanttDiagram.OnMouseDown := @MDown;
+  GanttDiagram.OnMouseMove := @MMove;
+  GanttDiagram.OnMouseUp := @MUp;
+  GanttDiagram.OnDblClick := @DblClick;
+  //GanttDiagram.OnClick := @Click;
+  //StringGrid1.OnClick := @Click;
+  StringGrid1.OnDblClick := @DblClick;
 
   //GC :=  TgsGantt.Create(Self);
   //GC.Parent := Self;
@@ -191,6 +198,11 @@ begin
   //        GC.Interval[i].AddInterval(LInterval);
   //      end;
   //  end;
+end;
+
+procedure TForm1.Panel2Click(Sender: TObject);
+begin
+  ShowMessage('PanelClick');
 end;
 
 procedure TForm1.Debug(AMessage: string; AShowMessage: boolean);
@@ -235,6 +247,16 @@ procedure TForm1.MUp(Sender: Tobject; Button: TMouseButton; Shift: TShiftState;
   X, Y: Integer);
 begin
   Memo1.Lines.Add('OnMouseUp ' + Format('x %d y %d',[X, Y]));
+end;
+
+procedure TForm1.Click(Sender: TObject);
+begin
+  ShowMessage('Click');
+end;
+
+procedure TForm1.DblClick(Sender: TObject);
+begin
+  ShowMessage('DblClick');
 end;
 
 end.

@@ -16,7 +16,7 @@
   @Author: Vasiliy Ponomarjov
   @Email: phantovas@gmail.com
   @created: 06-JAN-2019
-  @modified: 04-FEB-2019
+  @modified: 05-FEB-2019
   @version: migrate to 0.4a
 
 /******************************************************************************/
@@ -324,6 +324,8 @@ type
       FDateFormat: String;
       FEndDate: TDate;
       FFactIntervalColor: TColor;
+      FOnClick: TNotifyEvent;
+      FOnDblClick: TNotifyEvent;
       FPlanIntervalColor: TColor;
       FFreeIntervalColor: TColor;
       FExpiredIntervalColor: TColor;
@@ -387,6 +389,8 @@ type
       procedure SetMajorScaleHeight(AValue: integer);
       procedure SetMinorScale(AValue: TvpTimeScale);
       procedure SetMinorScaleHeight(AValue: integer);
+      procedure SetOnClick(AValue: TNotifyEvent);
+      procedure SetOnDblClick(AValue: TNotifyEvent);
       procedure SetOptions(AValue: TvpGanttOptions);
       procedure SetPixelPerMinorScale(AValue: integer);
       procedure SetPlanIntervalColor(AValue: TColor);
@@ -480,8 +484,6 @@ type
       property BorderStyle;
       property BorderWidth;
       //events
-      property OnClick;
-      property OnDblClick;
       property OnResize;
       property OnKeyDown;
       property OnKeyPress;
@@ -489,6 +491,8 @@ type
       property OnMouseDown;
       property OnMouseMove;
       property OnMouseUp;
+      property OnClick: TNotifyEvent read FOnClick write SetOnClick;
+      property OnDblClick: TNotifyEvent read FOnDblClick write SetOnDblClick;
       //custom property
       property BorderColor: TColor read FBorderColor write SetBorderColor default clActiveBorder;
       property EndDate: TDate read FEndDate write SetEndDate;
@@ -2097,28 +2101,37 @@ end;
 
 procedure TvpGanttCalendar.MouseDown(Button: TMouseButton; Shift: TShiftState;
   X, Y: Integer);
+var
+  curPoint: TPoint;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.MouseDown');
   {$endif}
-  TvpGantt(Parent).MouseDown(Button, Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseDown(Button, Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttCalendar.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  curPoint: TPoint;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.MouseMove');
   {$endif}
-  TvpGantt(Parent).MouseMove(Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseMove(Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttCalendar.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
   Y: Integer);
+var
+  curPoint: TPoint;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.MouseUp');
   {$endif}
-  TvpGantt(Parent).MouseUp(Button, Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseUp(Button, Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttCalendar.Paint;
@@ -2505,28 +2518,37 @@ end;
 
 procedure TvpGanttTasks.MouseDown(Button: TMouseButton; Shift: TShiftState; X,
   Y: Integer);
+var
+  curPoint: TPoint;
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.MouseDown');
   {$endif}
-  TvpGantt(Parent).MouseDown(Button, Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseDown(Button, Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttTasks.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  curPoint: TPoint;
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.MouseMove');
   {$endif}
-  TvpGantt(Parent).MouseMove(Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseMove(Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttTasks.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
   Y: Integer);
+var
+  curPoint: TPoint;
 begin
   {$ifdef DBGGANTTTASKS}
   Form1.Debug('TvpGanttTasks.MouseUp');
   {$endif}
-  TvpGantt(Parent).MouseUp(Button, Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseUp(Button, Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttTasks.Paint;
@@ -2997,6 +3019,26 @@ begin
     Exit;
   FMinorScaleHeight := AValue;
   VisualChange;
+end;
+
+procedure TvpGantt.SetOnClick(AValue: TNotifyEvent);
+begin
+  if FOnClick = AValue then Exit;
+  FOnClick := AValue;
+  if FvpGanttCalendar.HandleAllocated then
+    FvpGanttCalendar.OnClick := FOnClick;
+  if FvpGanttTasks.HandleAllocated then
+    FvpGanttTasks.OnClick := FOnClick;
+end;
+
+procedure TvpGantt.SetOnDblClick(AValue: TNotifyEvent);
+begin
+  if FOnDblClick = AValue then Exit;
+  FOnDblClick := AValue;
+  if FvpGanttCalendar.HandleAllocated then
+    FvpGanttCalendar.OnDblClick := FOnDblClick;
+  if FvpGanttTasks.HandleAllocated then
+    FvpGanttTasks.OnDblClick := FOnDblClick;
 end;
 
 procedure TvpGantt.SetOptions(AValue: TvpGanttOptions);
@@ -3762,13 +3804,10 @@ procedure TvpGantt.UpdateBoundDates(AStartDate, AEndDate: TDate);
 var
   aSYear, aSMonth, aSDay: word;
   aEYear, aEMonth, aEDay: word;
-  oldStartBound, oldEndBound: TDateTime;
 begin
   {$ifdef DBGGANTT}
   Form1.EL.Debug('TvpGantt.UpdateIntervalDates %s %s', [DateToStr(AStartDate), DateToStr(AEndDate)]);
   {$endif}
-  oldStartBound := FStartDateOfBound;
-  oldEndBound := FEndDateOfBound;
   //выбираем меньшую дату между занятой и устанавливаемой
   AStartDate := Min(AStartDate, StartDate);
   //если уже период считали, то проверяем не получили ли мы диапазон уже, чем в прошлый раз
