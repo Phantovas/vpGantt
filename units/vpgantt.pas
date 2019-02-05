@@ -70,6 +70,7 @@ const
   C_ROW_HIGHLIGHT_VALUE = 50;
   C_DEF_INTERVAL_PADDING = 3;
   C_DEF_INTERVAL_RADIUS = 3;
+  C_FACT_SHADOW_VALUE = -25;
 
 type
   TTitleStyle = (tsLazarus, tsStandard, tsNative);
@@ -514,7 +515,7 @@ type
       property TaskColor: TColor read GetTaskColor write SetTaskColor default clWindow;
       property TitleColor: TColor read FTitleColor write SetTitleColor default clBtnFace;
       property TaskTitleCaption: TCaption read GetTaskTitleCaption write SetTaskTitleCaption;
-      property PlanIntervalColor: TColor read FPlanIntervalColor write SetPlanIntervalColor default clSkyBlue;
+      property PlanIntervalColor: TColor read FPlanIntervalColor write SetPlanIntervalColor default clAqua;
       property FactIntervalColor: TColor read FFactIntervalColor write SetFactIntervalColor;
       property FreeIntervalColor: TColor read FFreeIntervalColor write SetFreeIntervalColor default clLime;
       property ExpiredIntervalColor: TColor read FExpiredIntervalColor write SetExpiredIntervalColor default clRed;
@@ -3960,8 +3961,8 @@ begin
   ScrollBars := ssAutoBoth;
   FRowHighlightColor :=  GetHighLightColor(clHighlight, C_ROW_HIGHLIGHT_VALUE);
 
-  FPlanIntervalColor := clSkyBlue;
-  FFactIntervalColor := GetShadowColor(clHighlight, -C_ROW_HIGHLIGHT_VALUE);
+  FPlanIntervalColor := clAqua;
+  FFactIntervalColor := GetShadowColor(clHighlight, C_FACT_SHADOW_VALUE);
   FFreeIntervalColor := clLime;
   FExpiredIntervalColor := clRed;
 
