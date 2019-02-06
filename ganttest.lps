@@ -40,7 +40,7 @@
         <UnitName Value="vpGantt"/>
         <IsVisibleTab Value="True"/>
         <TopLine Value="1787"/>
-        <CursorPos X="46" Y="1816"/>
+        <CursorPos X="32" Y="1815"/>
         <ExtraEditorCount Value="1"/>
         <ExtraEditor1>
           <EditorIndex Value="-1"/>
@@ -444,7 +444,7 @@
         <UsageCount Value="5"/>
       </Unit57>
       <Unit58>
-        <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\objpas\sysutils\datih.inc"/>
+        <Filename Value="C:\Lazarus\fpc\3.0.2\source\rtl\objpas\sysutils\datih.inc"/>
         <EditorIndex Value="1"/>
         <TopLine Value="110"/>
         <CursorPos X="10" Y="128"/>
@@ -474,7 +474,7 @@
         <UsageCount Value="7"/>
       </Unit61>
       <Unit62>
-        <Filename Value="C:\lazarus\lcl\graphutil.pp"/>
+        <Filename Value="C:\Lazarus\lcl\graphutil.pp"/>
         <UnitName Value="GraphUtil"/>
         <EditorIndex Value="2"/>
         <TopLine Value="46"/>
