@@ -16,7 +16,7 @@
   @Author: Vasiliy Ponomarjov
   @Email: phantovas@gmail.com
   @created: 06-JAN-2019
-  @modified: 05-FEB-2019
+  @modified: 06-FEB-2019
   @version: migrate to 0.4a
 
 /******************************************************************************/
@@ -71,6 +71,8 @@ const
   C_DEF_INTERVAL_PADDING = 3;
   C_DEF_INTERVAL_RADIUS = 3;
   C_FACT_SHADOW_VALUE = -25;
+  C_CURTIMELINE_WIDTH = 2;
+  C_CURTIMELINE_COLOR = clRed;
 
 type
   TTitleStyle = (tsLazarus, tsStandard, tsNative);
@@ -85,7 +87,9 @@ type
                 vpgHorzLine,                  //горизонтальный бордюр в сетке
                 vpgExtendVertLines,           //вертикальные разделители в высоту компонента
                 vpgRowHint,                   //всплывающие подсказки для каждой строки
-                vpgTitleTextNoScroll          //всегда показывать надписи в заголовках
+                vpgTitleTextNoScroll,         //всегда показывать надписи в заголовках
+                vpgShowCurrentTime,           //показывать текущее время
+                vpgScrollToCurrentTime        //автоматически прокручивать при обновлении на текущее время
                 );
 
   TvpGanttOptions = set of TvpgOption;
@@ -113,7 +117,8 @@ const
                          vpgHorzLine,
                          vpgVertLine,
                          vpgRowHint,
-                         vpgTitleTextNoScroll
+                         vpgTitleTextNoScroll,
+                         vpgShowCurrentTime
                         ];
 
 resourcestring
@@ -288,10 +293,11 @@ type
       function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
       function DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean; override;
       function DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint): Boolean; override;
+      procedure DrawCurrentTimeLine;
       procedure DrawEdges;
+      procedure DrawInterval(const aRow: integer);
       procedure DrawMajorScale;
       procedure DrawMinorScale;
-      procedure DrawInterval(const aRow: integer);
       procedure DrawRow(const aRow: integer);
       procedure DrawRows;
       procedure DrawScaleVertLines(const X: integer);
@@ -531,6 +537,7 @@ type
   function GetTimeScaleName(TimeScale: TvpTimeScale; D: TDateTime): String;
   function IncTime(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Integer): TDateTime;
   function IncTimeEx(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Double): TDateTime;
+  function DateInPeriod(const CurDate, StartPeriod, EndPeriod: TDateTime): boolean;
 
 implementation
 
@@ -984,6 +991,17 @@ begin
   end;
 
   Result := TimeStampToDateTime(S);
+end;
+
+{ Функция определения вхождения даты в заданный период
+  @param CurDate TDateTime текущее время
+  @param StartPeriod TDateTime начало периода
+  @param EndPeriod TDateTime конец периода
+  @return boolean истина/ложь
+}
+function DateInPeriod(const CurDate, StartPeriod, EndPeriod: TDateTime): boolean;
+begin
+  Result := (CurDate>=StartPeriod) AND (CurDate<=EndPeriod);
 end;
 
 
@@ -1775,6 +1793,32 @@ begin
     end;
 end;
 
+procedure TvpGanttCalendar.DrawCurrentTimeLine;
+var
+  lineLeft, lineBottom: integer;
+  timePadding: Double;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.');
+  {$endif}
+  if not (vpgShowCurrentTime in TvpGantt(Parent).Options) then
+    Exit;
+  if DateInPeriod(Now, TvpGantt(Parent).FStartDateOfBound, TvpGantt(Parent).FEndDateOfBound) then
+    begin
+      timePadding := UnitsBetweenDates(TvpGantt(Parent).FStartDateOfBound, Now, FMinorScale);
+      lineLeft := Trunc(timePadding * TvpGantt(Parent).PixelPerMinorScale) - FHScrollPosition;
+      //рисуем до конца видимой части компонента или до конца списка
+      if vpgExtendVertLines in TvpGantt(Parent).Options then
+        lineBottom := ClientHeight
+      else
+        lineBottom := FCalendarHeight;
+      Canvas.Pen.Style := psSolid;
+      Canvas.Pen.Width := C_CURTIMELINE_WIDTH;
+      Canvas.Pen.Color := C_CURTIMELINE_COLOR;
+      Canvas.Line(lineLeft, TvpGantt(Parent).GetTitleHeight, lineLeft, lineBottom - 1);
+    end;
+end;
+
 procedure TvpGanttCalendar.DrawEdges;
 begin
   {$ifdef DBGGANTTCALENDAR}
@@ -2145,6 +2189,7 @@ begin
   DrawRows;
   DrawMajorScale;
   DrawMinorScale;
+  DrawCurrentTimeLine;
   DrawEdges;
 end;
 
