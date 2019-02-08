@@ -1812,7 +1812,7 @@ begin
         lineBottom := ClientHeight
       else
         lineBottom := FCalendarHeight;
-      Canvas.Pen.Style := psDot;
+      Canvas.Pen.Style := psDash;
       Canvas.Pen.Width := C_CURTIMELINE_WIDTH;
       Canvas.Pen.Color := C_CURTIMELINE_COLOR;
       Canvas.Line(lineLeft, TvpGantt(Parent).GetTitleHeight, lineLeft, lineBottom - 1);
