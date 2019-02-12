@@ -21,9 +21,10 @@
         <UnitName Value="Unit1"/>
         <EditorIndex Value="4"/>
         <TopLine Value="129"/>
-        <CursorPos X="117" Y="158"/>
+        <CursorPos X="109" Y="140"/>
         <UsageCount Value="200"/>
         <Loaded Value="True"/>
+        <LoadedDesigner Value="True"/>
       </Unit1>
       <Unit2>
         <Filename Value="units\vpganttinterval.pas"/>
@@ -38,8 +39,8 @@
         <Filename Value="units\vpgantt.pas"/>
         <UnitName Value="vpGantt"/>
         <IsVisibleTab Value="True"/>
-        <TopLine Value="4158"/>
-        <CursorPos X="24" Y="4176"/>
+        <TopLine Value="61"/>
+        <CursorPos X="32" Y="75"/>
         <ExtraEditorCount Value="1"/>
         <ExtraEditor1>
           <EditorIndex Value="-1"/>
@@ -540,7 +541,7 @@
         <UsageCount Value="10"/>
       </Unit70>
     </Units>
-    <JumpHistory Count="11" HistoryIndex="10">
+    <JumpHistory Count="16" HistoryIndex="15">
       <Position1>
         <Filename Value="units\vpgantt.pas"/>
         <Caret Line="1620" TopLine="1620"/>
@@ -585,6 +586,26 @@
         <Filename Value="units\vpgantt.pas"/>
         <Caret Line="4176" Column="69" TopLine="4167"/>
       </Position11>
+      <Position12>
+        <Filename Value="units\vpgantt.pas"/>
+        <Caret Line="4179" Column="34" TopLine="4056"/>
+      </Position12>
+      <Position13>
+        <Filename Value="units\vpgantt.pas"/>
+        <Caret Line="334" Column="3" TopLine="316"/>
+      </Position13>
+      <Position14>
+        <Filename Value="units\vpgantt.pas"/>
+        <Caret Line="336" Column="18" TopLine="298"/>
+      </Position14>
+      <Position15>
+        <Filename Value="units\vpgantt.pas"/>
+        <Caret Line="74" Column="22" TopLine="61"/>
+      </Position15>
+      <Position16>
+        <Filename Value="units\vpgantt.pas"/>
+        <Caret Line="1803" Column="18" TopLine="1794"/>
+      </Position16>
     </JumpHistory>
     <RunParams>
       <FormatVersion Value="2"/>

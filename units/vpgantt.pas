@@ -71,7 +71,7 @@ const
   C_DEF_INTERVAL_PADDING = 3;
   C_DEF_INTERVAL_RADIUS = 3;
   C_FACT_SHADOW_VALUE = -25;
-  C_CURTIMELINE_WIDTH = 2;
+  C_CURTIMELINE_WIDTH = 1;
   C_CURTIMELINE_COLOR = clRed;
 
 type
@@ -336,8 +336,6 @@ type
       FDateFormat: String;
       FEndDate: TDate;
       FFactIntervalColor: TColor;
-      FOnClick: TNotifyEvent;
-      FOnDblClick: TNotifyEvent;
       FPlanIntervalColor: TColor;
       FFreeIntervalColor: TColor;
       FExpiredIntervalColor: TColor;
@@ -1821,7 +1819,7 @@ begin
         lineBottom := ClientHeight
       else
         lineBottom := FCalendarHeight;
-      Canvas.Pen.Style := psDash;
+      Canvas.Pen.Style := psSolid;
       Canvas.Pen.Width := C_CURTIMELINE_WIDTH;
       Canvas.Pen.Color := C_CURTIMELINE_COLOR;
       Canvas.Line(lineLeft, lineTop, lineLeft, lineBottom - 1);
