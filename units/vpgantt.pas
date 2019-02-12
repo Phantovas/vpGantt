@@ -16,7 +16,7 @@
   @Author: Vasiliy Ponomarjov
   @Email: phantovas@gmail.com
   @created: 06-JAN-2019
-  @modified: 06-FEB-2019
+  @modified: 12-FEB-2019
   @version: migrate to 0.4a
 
 /******************************************************************************/
@@ -52,7 +52,7 @@ interface
 
 uses
   LCLproc, LCLIntf, LCLType, LMessages, SysUtils, Classes, Controls,
-  StdCtrls, Forms, ExtCtrls,
+  StdCtrls, Forms, ExtCtrls, fgl,
   //require
   Graphics, GraphUtil, Math, dateutils, Themes,
   //temp
@@ -142,7 +142,12 @@ resourcestring
   RS_HINT_COMPLETE = 'Выполнено за: ';
 
 type
+
+  TvpInterval = class;
+
   TvpGantt = class;
+
+  TvpIntervalList = specialize TFPGObjectList<TvpInterval>;
 
   { TvpBaseInterval }
 
@@ -349,7 +354,7 @@ type
       FMouseInterval: integer;
       FSavedHint: string;
 
-      FIntervals: TList;
+      FIntervals: TvpIntervalList;
       FStartDateOfBound: TDateTime;
       FEndDateOfBound: TDateTime;
 
@@ -1795,7 +1800,7 @@ end;
 
 procedure TvpGanttCalendar.DrawCurrentTimeLine;
 var
-  lineLeft, lineBottom: integer;
+  lineLeft, lineTop, lineBottom: integer;
   timePadding: Double;
 begin
   {$ifdef DBGGANTTCALENDAR}
@@ -1807,6 +1812,10 @@ begin
     begin
       timePadding := UnitsBetweenDates(TvpGantt(Parent).FStartDateOfBound, Now, FMinorScale);
       lineLeft := Trunc(timePadding * TvpGantt(Parent).PixelPerMinorScale) - FHScrollPosition;
+      //верх, если titleStyle tsNative то -1 надо сделать, а то неприятный зазор
+      lineTop := TvpGantt(Parent).GetTitleHeight;
+      if TvpGantt(Parent).FTitleStyle = tsNative then
+        dec(lineTop);
       //рисуем до конца видимой части компонента или до конца списка
       if vpgExtendVertLines in TvpGantt(Parent).Options then
         lineBottom := ClientHeight
@@ -1815,7 +1824,7 @@ begin
       Canvas.Pen.Style := psDash;
       Canvas.Pen.Width := C_CURTIMELINE_WIDTH;
       Canvas.Pen.Color := C_CURTIMELINE_COLOR;
-      Canvas.Line(lineLeft, TvpGantt(Parent).GetTitleHeight, lineLeft, lineBottom - 1);
+      Canvas.Line(lineLeft, lineTop, lineLeft, lineBottom - 1);
     end;
 end;
 
@@ -2909,7 +2918,7 @@ begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.GetInterval');
   {$endif}
-  Result := TvpInterval(FIntervals[AnIndex]);
+  Result := FIntervals[AnIndex];
 end;
 
 procedure TvpGantt.OnTitleFontChanged(Sender: TObject);
@@ -3345,7 +3354,6 @@ begin
         //кол-во видимых строк
         DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
         SelectNextRow(-DeltaRow);
-        {TODO -oVas: неправильно работает прокрутка постраничная}
       end;
     VK_NEXT:
       begin
@@ -3806,15 +3814,15 @@ begin
   if not (vpgRowHint in Options) OR (FMouseInterval<0) then
     Exit;
   //строим подсказку
-  txt := TvpInterval(FIntervals[FMouseInterval]).Name;
-  txt := txt + LineEnding + RS_HINT_STARTDATE + FormatDateTime(DateFormat, TvpInterval(FIntervals[FMouseInterval]).StartDate);
+  txt := FIntervals[FMouseInterval].Name;
+  txt := txt + LineEnding + RS_HINT_STARTDATE + FormatDateTime(DateFormat, FIntervals[FMouseInterval].StartDate);
   //продолжительность в часах
-  duration := RoundTo(TvpInterval(FIntervals[FMouseInterval]).Duration * 24, -2);
+  duration := RoundTo(FIntervals[FMouseInterval].Duration * 24, -2);
   txt := txt + LineEnding + RS_HINT_DURATION + FloatToStr(duration) + ' ' + RS_HOUR;
-  if TvpInterval(FIntervals[FMouseInterval]).FFinishDate>0 then
+  if FIntervals[FMouseInterval].FFinishDate>0 then
     begin
-      txt := txt + LineEnding + RS_HINT_FINISHDATE + FormatDateTime(DateFormat, TvpInterval(FIntervals[FMouseInterval]).FinishDate);
-      complete := RoundTo(TvpInterval(FIntervals[FMouseInterval]).Complete * 24, -2);
+      txt := txt + LineEnding + RS_HINT_FINISHDATE + FormatDateTime(DateFormat, FIntervals[FMouseInterval].FinishDate);
+      complete := RoundTo(FIntervals[FMouseInterval].Complete * 24, -2);
       txt := txt + LineEnding + RS_HINT_COMPLETE + FloatToStr(complete) + ' ' + RS_HOUR;
     end;
   if (txt = '') and (FSavedHint <> '') then
@@ -3968,7 +3976,7 @@ begin
   Form1.EL.Debug('TabStop %d', [Integer(TabStop)]);
   {$endif}
 
-  FIntervals := TList.Create;
+  FIntervals := TvpIntervalList.Create;
 
   //create vpGanttTasks
   FvpGanttTasks := TvpGanttTasks.Create(Self);
@@ -4051,23 +4059,21 @@ begin
 end;
 
 destructor TvpGantt.Destroy;
-var
-  i: Integer;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.Destroy');
   {$endif}
   try
     try
-      for i := 0 to FIntervals.Count-1 do
-        TvpInterval(FIntervals.Items[i]).Free;
+      //for i := 0 to FIntervals.Count-1 do
+      //  FIntervals.Items[i].Free;
     except
     end;
   finally
     FvpGanttCalendar.Free;
     FSplitter.Free;
     FvpGanttTasks.Free;
-    FreeAndNil(FIntervals);
+    FIntervals.Free;
     FreeThenNil(FTitleFont);
   end;
   inherited Destroy;
@@ -4132,8 +4138,8 @@ begin
   {$endif}
   //изменяются даты, пересчитаем только в случае если календарь создан
   if AnIndex>=0 then
-    UpdateBoundDates(TvpInterval(FIntervals[AnIndex]).StartDate,
-                     TvpInterval(FIntervals[AnIndex]).FinishDate);
+    UpdateBoundDates(FIntervals[AnIndex].StartDate,
+                     FIntervals[AnIndex].FinishDate);
   VisualChange;
 end;
 
@@ -4147,27 +4153,28 @@ begin
   BeginUpdate;
   if IntervalCount>0 then
     for i:=0 to IntervalCount-1 do
-      TvpInterval(FIntervals[i]).UpdateBounds;
+      FIntervals[i].UpdateBounds;
   EndUpdate();
 end;
 
 procedure TvpGantt.Clear;
-var
-  i:integer;
 begin
   {$ifdef DBGGANTT}
   Form1.Debug('TvpGantt.Clear');
   {$endif}
   BeginUpdate;
-  for i:=0 to IntervalCount-1 do
-    TvpInterval(FIntervals[i]).Free;
+  //for i:=0 to IntervalCount-1 do
+  //  TvpInterval(FIntervals[i]).Free;
   FIntervals.Clear;
   FStartDateOfBound := 0;
   FEndDateOfBound := 0;
   UpdateBoundDates(FStartDate, FEndDate);
-  {TODO -o Vas: Подумать о сбросе горизонтального скроллинга в календаре}
-  //if FvpGanttCalendar.HandleAllocated then
-  //  FvpGanttCalendar.FHScrollPosition := 0;
+  //при очистке прокручиваем скроллинг в начало диапазона
+  if FvpGanttCalendar.HandleAllocated then
+    begin
+      FvpGanttCalendar.FHScrollPosition := 0;
+      FvpGanttCalendar.ScrollBarPosition(SB_HORZ, FvpGanttCalendar.FHScrollPosition);
+    end;
   EndUpdate();
 end;
 
