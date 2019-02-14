@@ -71,9 +71,9 @@ const
   C_DEF_INTERVAL_PADDING = 3;
   C_DEF_INTERVAL_RADIUS = 3;
   C_FACT_SHADOW_VALUE = -25;
-  C_CURTIMELINE_WIDTH = 1;        //ширина линии текущего времени
-  C_CURTIMELINE_SOLID = 2;        //длина участка линии
-  C_CURTIMELINE_CLEAR = 1;        //длина участка пустоты
+  C_CURTIMELINE_WIDTH = 2;        //ширина линии текущего времени
+  C_CURTIMELINE_SOLID = 4;        //длина участка линии
+  C_CURTIMELINE_CLEAR = 2;        //длина участка пустоты
   C_CURTIMELINE_COLOR = $7277C6; //какой-то бордовенький, но красивый :)
 
 type
