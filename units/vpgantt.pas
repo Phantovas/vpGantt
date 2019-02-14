@@ -284,6 +284,7 @@ type
       function CalcRowRect(const aRow: integer): TRect;
       procedure CalcScaleCount;
       procedure CalcCurrentTimeRect;
+      function CurDateInRange: boolean;
       function GetMajorScaleHeight: integer;
       function GetMajorScaleWidth(const aCurItem: integer): integer;
       function GetMinorScaleHeight: integer;
@@ -321,6 +322,7 @@ type
       procedure ScrollBarPage(Which: Integer; aPage: Integer);
       procedure ScrollBarShow(Which: Integer; aValue: boolean);
       procedure ScrollToFocus;
+      procedure ScrollToCurrentTime;
       procedure UpdateHorzScrollBar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure UpdateVertScrollbar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure WMHScroll(var message : TLMHScroll); message LM_HSCROLL;
@@ -480,6 +482,7 @@ type
       procedure UpdateDates;
       function Focused: boolean; override;
       procedure Repaint; override;
+      procedure ScrollToCurrentTime;
 
       procedure BeginUpdate;
       procedure EndUpdate(aRefresh: boolean = true);
@@ -1242,6 +1245,34 @@ begin
   {$EndIf}
 end;
 
+procedure TvpGanttCalendar.ScrollToCurrentTime;
+var
+  curPos: integer;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.ScrollToCurrentTime');
+  {$EndIf}
+  if not CurDateInRange then
+    Exit;
+  //считаем
+  CalcCurrentTimeRect;
+  curPos := FCurTimeLineRect.Left;
+  //если не видим
+  if (curPos>ClientWidth) then
+    begin
+      FHScrollPosition := FCurTimeLineRect.Left - ClientWidth div 2;
+      ScrollBarPosition(SB_HORZ, FHScrollPosition);
+    end
+  else if (curPos<0) AND (FHScrollPosition>0) then
+    begin
+      FHScrollPosition := FCurTimeLineRect.Left + FHScrollPosition - ClientWidth div 2;
+      ScrollBarPosition(SB_HORZ, FHScrollPosition);
+    end
+  else
+    Exit;
+  Invalidate;
+end;
+
 function TvpGanttCalendar.CalcRowRect(const aRow: integer): TRect;
 var
   aStart: integer;
@@ -1310,7 +1341,7 @@ begin
   if DateInPeriod(Now, TvpGantt(Parent).FStartDateOfBound, TvpGantt(Parent).FEndDateOfBound) then
     begin
       timePadding := UnitsBetweenDates(TvpGantt(Parent).FStartDateOfBound, Now, FMinorScale);
-      FCurTimeLineRect.Left := Trunc(timePadding * TvpGantt(Parent).PixelPerMinorScale);
+      FCurTimeLineRect.Left := Trunc(timePadding * TvpGantt(Parent).PixelPerMinorScale) - FHScrollPosition;
       //верх, если titleStyle tsNative то -1 надо сделать, а то неприятный зазор
       FCurTimeLineRect.Top := TvpGantt(Parent).GetTitleHeight;
       if TvpGantt(Parent).FTitleStyle = tsNative then
@@ -1323,6 +1354,14 @@ begin
     end
   else
     FCurTimeLineRect := Rect(0,0,0,0);
+end;
+
+function TvpGanttCalendar.CurDateInRange: boolean;
+begin
+  {$ifdef DBGGANTTCALENDAR}
+  Form1.Debug('TvpGanttCalendar.CurDateInRange');
+  {$endif}
+  Result := DateInPeriod(Now, TvpGantt(Parent).FStartDateOfBound, TvpGantt(Parent).FEndDateOfBound);
 end;
 
 procedure TvpGanttCalendar.CalcCalendarHeight;
@@ -1812,22 +1851,20 @@ begin
 end;
 
 procedure TvpGanttCalendar.DrawCurrentTimeLine;
-var
-  lineLeft: integer;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.');
   {$endif}
   if not (vpgShowCurrentTime in TvpGantt(Parent).Options) then
     Exit;
+  //рассчитывваем, чтобы изменить текущее время
   CalcCurrentTimeRect;
   if FCurTimeLineRect.Height>0 then
     begin
-      lineLeft := FCurTimeLineRect.Left;
       Canvas.Pen.Style := psSolid;
       Canvas.Pen.Width := C_CURTIMELINE_WIDTH;
       Canvas.Pen.Color := C_CURTIMELINE_COLOR;
-      Canvas.Line(lineLeft, FCurTimeLineRect.Top, lineLeft, FCurTimeLineRect.Bottom - 1);
+      Canvas.Line(FCurTimeLineRect.Left, FCurTimeLineRect.Top, FCurTimeLineRect.Left, FCurTimeLineRect.Bottom - 1);
     end;
 end;
 
@@ -3717,6 +3754,15 @@ procedure TvpGantt.Repaint;
 begin
   UpdateSizes;
   inherited Repaint;
+end;
+
+procedure TvpGantt.ScrollToCurrentTime;
+begin
+  {$ifdef DBGGANTT}
+  Form1.Debug('TvpGantt.ScrollToCurrentTime');
+  {$endif}
+  if (FUpdateCount=0) AND (FvpGanttCalendar.HandleAllocated) then
+    FvpGanttCalendar.ScrollToCurrentTime;
 end;
 
 function TvpGantt.GetMinorScaleHeight: integer;

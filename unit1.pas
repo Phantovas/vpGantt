@@ -86,7 +86,7 @@ begin
   StringGrid1.GridLineWidth := StringGrid1.GridLineWidth +1;
   Memo1.Lines.Add('StringGrid1.GridLineWidth ' + IntToStr(StringGrid1.GridLineWidth));
 
-  GanttDiagram.Repaint;
+  GanttDiagram.ScrollToCurrentTime;
 end;
 
 procedure TForm1.Button2Click(Sender: TObject);
@@ -156,8 +156,8 @@ begin
   GanttDiagram.ScrollBars := ssAutoBoth;
   GanttDiagram.BorderStyle := bsSingle;
   GanttDiagram.TaskTitleCaption := 'Наряды';
-  GanttDiagram.MinorScale := vptsDay;
-  GanttDiagram.MajorScale := vptsMonth;
+  GanttDiagram.MinorScale := vptsHour;
+  GanttDiagram.MajorScale := vptsDay;
   GanttDiagram.TitleStyle := tsNative;
   GanttDiagram.GridBorderWidth := 1;
   GanttDiagram.Hint := 'Это стандартный скрипт';
