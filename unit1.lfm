@@ -104,18 +104,19 @@ object Form1: TForm1
       Top = 1
       Width = 5
     end
-    object StringGrid1: TStringGrid
-      Left = 104
-      Height = 246
-      Top = 1
-      Width = 263
-      Align = alClient
-      ColCount = 150
-      GridLineWidth = 3
-      Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goRangeSelect, goDrawFocusSelected, goSmoothScroll, goRowHighlight]
-      RowCount = 50
+    object DateEdit1: TDateEdit
+      Left = 152
+      Height = 23
+      Top = 24
+      Width = 103
+      CalendarDisplaySettings = [dsShowHeadings, dsShowDayNames]
+      OnAcceptDate = DateEdit1AcceptDate
+      DateOrder = doNone
+      ButtonWidth = 23
+      NumGlyphs = 1
+      MaxLength = 0
       TabOrder = 2
-      TitleStyle = tsNative
+      Text = 'DateEdit1'
     end
   end
   object Panel3: TPanel

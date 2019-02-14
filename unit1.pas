@@ -5,9 +5,8 @@ unit Unit1;
 interface
 
 uses
-  Classes, SysUtils, FileUtil,
-  Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls, Grids, vpGantt,
-  eventlog, dateutils;
+  Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, StdCtrls,
+  ExtCtrls, Grids, EditBtn, vpGantt, eventlog, dateutils;
 
 type
 
@@ -19,6 +18,7 @@ type
     Button3: TButton;
     ChBStyle: TCheckBox;
     ChBFlat: TCheckBox;
+    DateEdit1: TDateEdit;
     EL: TEventLog;
     Label1: TLabel;
     ListBox1: TListBox;
@@ -28,12 +28,13 @@ type
     Panel3: TPanel;
     Panel4: TPanel;
     Splitter1: TSplitter;
-    StringGrid1: TStringGrid;
     procedure Button1Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
     procedure Button3Click(Sender: TObject);
     procedure ChBFlatChange(Sender: TObject);
     procedure ChBStyleChange(Sender: TObject);
+    procedure DateEdit1AcceptDate(Sender: TObject; var ADate: TDateTime;
+      var AcceptDate: Boolean);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormShow(Sender: TObject);
     procedure Panel2Click(Sender: TObject);
@@ -82,9 +83,6 @@ begin
   Memo1.Lines.Add('Panel4.ClientREct.Bottom ' + IntToStr(Panel4.ClientREct.Bottom));
   Memo1.Lines.Add('Panel4.ClientREct.Width ' + IntToStr(Panel4.ClientREct.Width));
   Memo1.Lines.Add('Panel4.ClientREct.HEight ' + IntToStr(Panel4.ClientREct.Height));
-
-  StringGrid1.GridLineWidth := StringGrid1.GridLineWidth +1;
-  Memo1.Lines.Add('StringGrid1.GridLineWidth ' + IntToStr(StringGrid1.GridLineWidth));
 
   GanttDiagram.ScrollToCurTime;
 end;
@@ -136,6 +134,14 @@ begin
   LogClientRect(GanttDiagram);
 end;
 
+procedure TForm1.DateEdit1AcceptDate(Sender: TObject; var ADate: TDateTime;
+  var AcceptDate: Boolean);
+begin
+  GanttDiagram.Clear;
+  GanttDiagram.StartDate := DateEdit1.Date;
+  GanttDiagram.EndDate := DateEdit1.Date;
+end;
+
 procedure TForm1.FormClose(Sender: TObject; var CloseAction: TCloseAction);
 begin
   try
@@ -169,7 +175,6 @@ begin
   GanttDiagram.OnDblClick := @DblClick;
   //GanttDiagram.OnClick := @Click;
   //StringGrid1.OnClick := @Click;
-  StringGrid1.OnDblClick := @DblClick;
 
   //GC :=  TgsGantt.Create(Self);
   //GC.Parent := Self;

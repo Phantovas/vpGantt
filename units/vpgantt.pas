@@ -71,7 +71,9 @@ const
   C_DEF_INTERVAL_PADDING = 3;
   C_DEF_INTERVAL_RADIUS = 3;
   C_FACT_SHADOW_VALUE = -25;
-  C_CURTIMELINE_WIDTH = 2;
+  C_CURTIMELINE_WIDTH = 1;        //ширина линии текущего времени
+  C_CURTIMELINE_SOLID = 2;        //длина участка линии
+  C_CURTIMELINE_CLEAR = 1;        //длина участка пустоты
   C_CURTIMELINE_COLOR = $7277C6; //какой-то бордовенький, но красивый :)
 
 type
@@ -1846,6 +1848,8 @@ begin
 end;
 
 procedure TvpGanttCalendar.DrawCurrentTimeLine;
+var
+  aPenPattern: TPenPattern;
 begin
   {$ifdef DBGGANTTCALENDAR}
   Form1.Debug('TvpGanttCalendar.');
@@ -1856,10 +1860,15 @@ begin
   CalcCurrentTimeRect;
   if FCurTimeLineRect.Height>0 then
     begin
-      Canvas.Pen.Style := psDash;
+      Canvas.Pen.Style := psPattern;
+      SetLength(aPenPattern, 2);
+      aPenPattern[0] := C_CURTIMELINE_SOLID;
+      aPenPattern[1] := C_CURTIMELINE_CLEAR;
+      Canvas.Pen.SetPattern(aPenPattern);
       Canvas.Pen.Width := C_CURTIMELINE_WIDTH;
       Canvas.Pen.Color := C_CURTIMELINE_COLOR;
       Canvas.Line(FCurTimeLineRect.Left, FCurTimeLineRect.Top, FCurTimeLineRect.Left, FCurTimeLineRect.Bottom - 1);
+      SetLength(aPenPattern, 0);
     end;
 end;
 
@@ -2999,6 +3008,8 @@ begin
       FEndDate := aDT;
       if FEndDate<FStartDate then
         FStartDate := StartOfTheDay(aDT);
+      //обнуляем текущий диапазон, мы его пересчитаем
+      FEndDateOfBound := 0;
       UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
@@ -3199,6 +3210,8 @@ begin
       FStartDate := aDT;
       if FStartDate>FEndDate then
         FEndDate := EndOfTheDay(aDT);
+      //обнуляем текущий диапазон, мы его пересчитаем
+      FStartDateOfBound := 0;
       UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
