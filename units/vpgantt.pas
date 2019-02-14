@@ -71,8 +71,8 @@ const
   C_DEF_INTERVAL_PADDING = 3;
   C_DEF_INTERVAL_RADIUS = 3;
   C_FACT_SHADOW_VALUE = -25;
-  C_CURTIMELINE_WIDTH = 1;
-  C_CURTIMELINE_COLOR = clRed;
+  C_CURTIMELINE_WIDTH = 2;
+  C_CURTIMELINE_COLOR = $7277C6; //какой-то бордовенький, но красивый :)
 
 type
   TTitleStyle = (tsLazarus, tsStandard, tsNative);
@@ -88,8 +88,7 @@ type
                 vpgExtendVertLines,           //вертикальные разделители в высоту компонента
                 vpgRowHint,                   //всплывающие подсказки для каждой строки
                 vpgTitleTextNoScroll,         //всегда показывать надписи в заголовках
-                vpgShowCurrentTime,           //показывать текущее время
-                vpgScrollToCurrentTime        //автоматически прокручивать при обновлении на текущее время
+                vpgShowCurrentTime            //показывать текущее время
                 );
 
   TvpGanttOptions = set of TvpgOption;
@@ -322,7 +321,7 @@ type
       procedure ScrollBarPage(Which: Integer; aPage: Integer);
       procedure ScrollBarShow(Which: Integer; aValue: boolean);
       procedure ScrollToFocus;
-      procedure ScrollToCurrentTime;
+      procedure ScrollToCurTime;
       procedure UpdateHorzScrollBar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure UpdateVertScrollbar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure WMHScroll(var message : TLMHScroll); message LM_HSCROLL;
@@ -482,7 +481,7 @@ type
       procedure UpdateDates;
       function Focused: boolean; override;
       procedure Repaint; override;
-      procedure ScrollToCurrentTime;
+      procedure ScrollToCurTime;
 
       procedure BeginUpdate;
       procedure EndUpdate(aRefresh: boolean = true);
@@ -1245,7 +1244,7 @@ begin
   {$EndIf}
 end;
 
-procedure TvpGanttCalendar.ScrollToCurrentTime;
+procedure TvpGanttCalendar.ScrollToCurTime;
 var
   curPos: integer;
 begin
@@ -1257,19 +1256,15 @@ begin
   //считаем
   CalcCurrentTimeRect;
   curPos := FCurTimeLineRect.Left;
-  //если не видим
+  //если не видим, иначе выходим
   if (curPos>ClientWidth) then
-    begin
-      FHScrollPosition := FCurTimeLineRect.Left - ClientWidth div 2;
-      ScrollBarPosition(SB_HORZ, FHScrollPosition);
-    end
+    FHScrollPosition := FCurTimeLineRect.Left - ClientWidth div 2
   else if (curPos<0) AND (FHScrollPosition>0) then
-    begin
-      FHScrollPosition := FCurTimeLineRect.Left + FHScrollPosition - ClientWidth div 2;
-      ScrollBarPosition(SB_HORZ, FHScrollPosition);
-    end
+    FHScrollPosition := FCurTimeLineRect.Left + FHScrollPosition - ClientWidth div 2
   else
     Exit;
+  //прокручиваем до нужного места
+  ScrollBarPosition(SB_HORZ, FHScrollPosition);
   Invalidate;
 end;
 
@@ -1861,7 +1856,7 @@ begin
   CalcCurrentTimeRect;
   if FCurTimeLineRect.Height>0 then
     begin
-      Canvas.Pen.Style := psSolid;
+      Canvas.Pen.Style := psDash;
       Canvas.Pen.Width := C_CURTIMELINE_WIDTH;
       Canvas.Pen.Color := C_CURTIMELINE_COLOR;
       Canvas.Line(FCurTimeLineRect.Left, FCurTimeLineRect.Top, FCurTimeLineRect.Left, FCurTimeLineRect.Bottom - 1);
@@ -3756,13 +3751,13 @@ begin
   inherited Repaint;
 end;
 
-procedure TvpGantt.ScrollToCurrentTime;
+procedure TvpGantt.ScrollToCurTime;
 begin
   {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.ScrollToCurrentTime');
+  Form1.Debug('TvpGantt.ScrollToCurTime');
   {$endif}
   if (FUpdateCount=0) AND (FvpGanttCalendar.HandleAllocated) then
-    FvpGanttCalendar.ScrollToCurrentTime;
+    FvpGanttCalendar.ScrollToCurTime;
 end;
 
 function TvpGantt.GetMinorScaleHeight: integer;

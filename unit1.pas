@@ -86,7 +86,7 @@ begin
   StringGrid1.GridLineWidth := StringGrid1.GridLineWidth +1;
   Memo1.Lines.Add('StringGrid1.GridLineWidth ' + IntToStr(StringGrid1.GridLineWidth));
 
-  GanttDiagram.ScrollToCurrentTime;
+  GanttDiagram.ScrollToCurTime;
 end;
 
 procedure TForm1.Button2Click(Sender: TObject);
