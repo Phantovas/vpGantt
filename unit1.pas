@@ -8,6 +8,7 @@ uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, StdCtrls,
   ExtCtrls, Grids, EditBtn, vpGantt, eventlog, dateutils;
 
+{$HINTS OFF}
 type
 
   { TForm1 }
@@ -45,8 +46,8 @@ type
     procedure MDown(Sender: Tobject; Button: TMouseButton; Shift:TShiftState; X,Y:Integer);
     procedure MMove(Sender: Tobject; Shift:TShiftState; X,Y:Integer);
     procedure MUp(Sender: Tobject; Button: TMouseButton; Shift:TShiftState; X,Y:Integer);
-    procedure Click(Sender: TObject);
-    procedure DblClick(Sender: TObject);
+    procedure vpClick(Sender: TObject);
+    procedure vpDblClick(Sender: TObject);
   public
     { public declarations }
     procedure Debug(AMessage: string; AShowMessage: boolean = false);
@@ -172,9 +173,9 @@ begin
   GanttDiagram.OnMouseDown := @MDown;
   GanttDiagram.OnMouseMove := @MMove;
   GanttDiagram.OnMouseUp := @MUp;
-  GanttDiagram.OnDblClick := @DblClick;
-  //GanttDiagram.OnClick := @Click;
-  //StringGrid1.OnClick := @Click;
+  GanttDiagram.OnDblClick := @vpDblClick;
+  //GanttDiagram.OnClick := @vpClick;
+  //StringGrid1.OnClick := @vpClick;
 
   //GC :=  TgsGantt.Create(Self);
   //GC.Parent := Self;
@@ -255,12 +256,12 @@ begin
   Memo1.Lines.Add('OnMouseUp ' + Format('x %d y %d',[X, Y]));
 end;
 
-procedure TForm1.Click(Sender: TObject);
+procedure TForm1.vpClick(Sender: TObject);
 begin
   ShowMessage('Click');
 end;
 
-procedure TForm1.DblClick(Sender: TObject);
+procedure TForm1.vpDblClick(Sender: TObject);
 var
   curIndex: integer;
 begin
@@ -268,5 +269,6 @@ begin
   Memo1.Lines.Add(IntToStr(curIndex));
 end;
 
+{$HINTS ON}
 end.
 
