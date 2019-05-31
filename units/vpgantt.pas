@@ -16,8 +16,8 @@
   @Author: Vasiliy Ponomarjov
   @Email: phantovas@gmail.com
   @created: 06-JAN-2019
-  @modified: 26-FEB-2019
-  @version: 0.4a
+  @modified: 31-MAY-2019
+  @version: 0.4b
 
 /******************************************************************************/
 
@@ -174,6 +174,7 @@ type
       FvpGantt: TvpGantt;
       FPlanRect: TRect;  //область планируемого времени
       FFactRect: TRect;  //область фактического времени
+      FGroup: boolean;   //группа
       function GetComplete: Double;
       function GetFinishDate: TDateTime;
       procedure SetDuration(AValue: Double);
@@ -194,6 +195,7 @@ type
       property FinishDate: TDateTime read GetFinishDate write SetFinishDate;
       property Duration: Double read FDuration write SetDuration;
       property Complete: Double read GetComplete;
+      property Group: Boolean read FGroup write FGroup default false;
   end;
 
   { TvpGanttTasks }
@@ -336,6 +338,7 @@ type
     private
       FDateFormat: String;
       FEndDate: TDate;
+      FGroupIntervalColor: TColor;
       FFactIntervalColor: TColor;
       FPlanIntervalColor: TColor;
       FFreeIntervalColor: TColor;
@@ -396,6 +399,7 @@ type
       procedure SetFactIntervalColor(AValue: TColor);
       procedure SetFocusColor(AValue: TColor);
       procedure SetFreeIntervalColor(AValue: TColor);
+      procedure SetGroupIntervalColor(AValue: TColor);
       procedure SetMajorScale(AValue: TvpTimeScale);
       procedure SetMajorScaleHeight(AValue: integer);
       procedure SetMinorScale(AValue: TvpTimeScale);
@@ -530,6 +534,7 @@ type
       property TaskColor: TColor read GetTaskColor write SetTaskColor default clWindow;
       property TitleColor: TColor read FTitleColor write SetTitleColor default clBtnFace;
       property TaskTitleCaption: TCaption read GetTaskTitleCaption write SetTaskTitleCaption;
+      property GroupIntervalColor: TColor read FGroupIntervalColor write SetGroupIntervalColor default cl3DLight;
       property PlanIntervalColor: TColor read FPlanIntervalColor write SetPlanIntervalColor default clAqua;
       property FactIntervalColor: TColor read FFactIntervalColor write SetFactIntervalColor;
       property FreeIntervalColor: TColor read FFreeIntervalColor write SetFreeIntervalColor default clLime;
@@ -1092,6 +1097,8 @@ procedure TvpInterval.CalcPlanBound;
 var
   countTimeScale: double;
 begin
+  if FGroup then Exit;
+  //иначе расчитываем область
   countTimeScale := UnitsBetweenDates(FvpGantt.GetStartDateOfBound, FStartDate, FvpGantt.MinorScale);
   FPlanRect.Left := Trunc(countTimeScale * FvpGantt.PixelPerMinorScale);
   if FDuration>0 then
@@ -1110,6 +1117,8 @@ procedure TvpInterval.CalcFactBound;
 var
   countTimeScale: Double;
 begin
+  if FGroup then Exit;
+  //иначе расчитываем область
   if FFinishDate>FStartDate then
     begin
       FFactRect.Left := FPlanRect.Left;
@@ -1126,6 +1135,7 @@ begin
   //initialize
   FPlanRect := Rect(0, 0, 0, 0);
   FFactRect := Rect(0, 0, 0, 0);
+  FGroup := false;
   //dates
   FStartDate := 0;
   FFinishDate := 0;
@@ -1849,7 +1859,10 @@ begin
           if tmpRect.Width>0 then
             begin
               TvpGantt(Parent).DrawCellGrid(Canvas, cellRect);
-              Canvas.Brush.Color := FColor;
+              if TvpGantt(Parent).FIntervals[aRow].Group then
+                Canvas.Brush.Color := TvpGantt(Parent).GroupIntervalColor
+              else
+                Canvas.Brush.Color := FColor;
               if Dv AND ([vpgMajorVertLine, vpgMinorVertLine]*TvpGantt(Parent).Options=[]) then
                 TvpGantt(Parent).CutVBorderFromRect(cellRect);
               //нижний бордюр срезаем всегда (ну в зависимости от установленного флага)
@@ -2179,7 +2192,10 @@ begin
       //бордюр
       TvpGantt(Parent).DrawCellGrid(Canvas, rowRect);
       //цвета
-      Canvas.Brush.Color := FColor;
+      if TvpGantt(Parent).FIntervals[aRow].Group then
+        Canvas.Brush.Color := TvpGantt(Parent).GroupIntervalColor
+      else
+        Canvas.Brush.Color := FColor;
       //ячейка cellRect пока не рубим, будем рисовать несколько ячеек и оно нам пригодится
       CopyRect(cellRect, rowRect);
       TvpGantt(Parent).CutHBorderFromRect(cellRect);
@@ -2603,6 +2619,14 @@ begin
   if FFreeIntervalColor = AValue then
     Exit;
   FFreeIntervalColor := AValue;
+  VisualChange;
+end;
+
+procedure TvpGantt.SetGroupIntervalColor(AValue: TColor);
+begin
+  if FGroupIntervalColor = AValue then
+    Exit;
+  FGroupIntervalColor := AValue;
   VisualChange;
 end;
 
@@ -3412,6 +3436,7 @@ begin
   ScrollBars := ssAutoBoth;
   FRowHighlightColor :=  GetHighLightColor(clHighlight, C_ROW_HIGHLIGHT_VALUE);
 
+  FGroupIntervalColor := cl3DLight;
   FPlanIntervalColor := clAqua;
   FFactIntervalColor := GetShadowColor(clHighlight, C_FACT_SHADOW_VALUE);
   FFreeIntervalColor := clLime;
@@ -3517,7 +3542,7 @@ end;
 procedure TvpGantt.UpdateInterval(AnIndex: Integer = -1);
 begin
   //изменяются даты, пересчитаем только в случае если календарь создан
-  if AnIndex>=0 then
+  if (AnIndex>=0) AND not FIntervals[AnIndex].Group then
     UpdateBoundDates(FIntervals[AnIndex].StartDate,
                      FIntervals[AnIndex].FinishDate);
   VisualChange;
@@ -3686,8 +3711,15 @@ begin
   if FGridBorderWidth>0 then
     begin
       //не рисуем обводку, если у нас используются стили
+      //в WIN10 будет пустая область, надо залить
       if FTitleStyle = tsNative then
-        Exit;
+        begin
+          ACanvas.Pen.Style := psSolid;
+          ACanvas.Pen.Color := cl3DShadow;
+          ACanvas.MoveTo(aRect.Left, aRect.Bottom - 1);
+          ACanvas.LineTo(aRect.Right, aRect.Bottom - 1);
+          Exit;
+        end;
       ACanvas.Pen.Style := psSolid;
       ACanvas.Pen.Color := cl3DHilight;
       ACanvas.MoveTo(aRect.Right - 1, aRect.Top);

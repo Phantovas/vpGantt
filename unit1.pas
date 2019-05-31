@@ -99,8 +99,13 @@ begin
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
       GInterval.Name := 'Наряд №' + IntToStr(i) + ' от ' + DateToStr(Now-10+i);
-      GInterval.StartDate := Now - 4 + i;
-      GInterval.Duration := 10;
+      if i = current then
+        GInterval.Group := true
+      else
+        begin
+          GInterval.StartDate := Now - 4 + i;
+          GInterval.Duration := 10;
+        end;
       if i = 4 then
         GInterval.FinishDate := GInterval.StartDate + 4;
       if i = 6 then
