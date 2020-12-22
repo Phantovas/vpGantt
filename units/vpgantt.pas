@@ -2,7 +2,7 @@
 /******************************************************************************/
                             vpGantt.pas
                             -----------
-                             ver. 0.3b
+                             ver. 0.4a
 
                      Gantt Diagramm component unit
                 Drawing a gantt diagramm from an interval list.
@@ -16,8 +16,8 @@
   @Author: Vasiliy Ponomarjov
   @Email: phantovas@gmail.com
   @created: 06-JAN-2019
-  @modified: 01-FEB-2019
-  @version: migrate to 0.4a
+  @modified: 31-MAY-2019
+  @version: 0.4b
 
 /******************************************************************************/
 
@@ -36,8 +36,9 @@
   4. Сделать сортировку по датам
 }
 
-
 unit vpGantt;
+
+{$mode ObjFPC}
 
 //{$define DBGINTERVAL}
 //{$define DBGGANTT}
@@ -53,9 +54,7 @@ uses
   LCLproc, LCLIntf, LCLType, LMessages, SysUtils, Classes, Controls,
   StdCtrls, Forms, ExtCtrls,
   //require
-  Graphics, GraphUtil, Math, dateutils, Themes,
-  //temp
-  Dialogs;
+  fgl, Graphics, GraphUtil, Math, dateutils, Themes;
 
 const
   C_DEF_SPLITTER_WIDTH = 2;
@@ -66,9 +65,14 @@ const
   C_VPGANTT_WIDTH = 300;
   C_VPGANTT_HEIGHT = 150;
   C_TITLE_TEXT_INDENT = 3;
-  C_ROW_HIGHLITE_VALUE = 50;
+  C_ROW_HIGHLIGHT_VALUE = 50;
   C_DEF_INTERVAL_PADDING = 3;
   C_DEF_INTERVAL_RADIUS = 3;
+  C_FACT_SHADOW_VALUE = -25;
+  C_CURTIMELINE_WIDTH = 2;        //ширина линии текущего времени
+  C_CURTIMELINE_SOLID = 4;        //длина участка линии
+  C_CURTIMELINE_CLEAR = 2;        //длина участка пустоты
+  C_CURTIMELINE_COLOR = $7277C6; //какой-то бордовенький, но красивый :)
 
 type
   TTitleStyle = (tsLazarus, tsStandard, tsNative);
@@ -83,35 +87,24 @@ type
                 vpgHorzLine,                  //горизонтальный бордюр в сетке
                 vpgExtendVertLines,           //вертикальные разделители в высоту компонента
                 vpgRowHint,                   //всплывающие подсказки для каждой строки
-                vpgTitleTextNoScroll          //всегда показывать надписи в заголовках
+                vpgTitleTextNoScroll,         //всегда показывать надписи в заголовках
+                vpgShowCurrentTime            //показывать текущее время
                 );
 
   TvpGanttOptions = set of TvpgOption;
 
-  //vptsMinute - минуты,
-  //vptsDecMinute - десятки минут (10..60),
-  //vptsHour - часы,
-  //vptsDay - дни,
-  //vptsDayWeek - дни недели,
-  //vptsWeek - недели (дата.год),
-  //vptsWeekNum - номер недели,
-  //vptsWeekNumPlain - название недели,
-  //vptsMonth - месяцы,
-  //vptsQuarter - кварталы,
-  //vptsHalfYear - полугодие,
-  //vptsYear - год
-  TvpTimeScale = (vptsMinute,
-                  vptsDecMinute,
-                  vptsHour,
-                  vptsDay,
-                  vptsDayWeek,
-                  vptsWeek,
-                  vptsWeekNum,
-                  vptsWeekNumPlain,
-                  vptsMonth,
-                  vptsQuarter,
-                  vptsHalfYear,
-                  vptsYear);
+  TvpTimeScale = (vptsMinute,                 //vptsMinute - минуты,
+                  vptsDecMinute,              //vptsDecMinute - десятки минут (10..60),
+                  vptsHour,                   //vptsHour - часы,
+                  vptsDay,                    //vptsDay - дни,
+                  vptsDayWeek,                //vptsDayWeek - дни недели,
+                  vptsWeek,                   //vptsWeek - недели (дата.год),
+                  vptsWeekNum,                //vptsWeekNum - номер недели,
+                  vptsWeekNumPlain,           //vptsWeekNumPlain - название недели,
+                  vptsMonth,                  //vptsMonth - месяцы,
+                  vptsQuarter,                //vptsQuarter - кварталы,
+                  vptsHalfYear,               //vptsHalfYear - полугодие,
+                  vptsYear);                  //vptsYear - год
 
 const
   constCellPadding: byte = 3;
@@ -123,7 +116,8 @@ const
                          vpgHorzLine,
                          vpgVertLine,
                          vpgRowHint,
-                         vpgTitleTextNoScroll
+                         vpgTitleTextNoScroll,
+                         vpgShowCurrentTime
                         ];
 
 resourcestring
@@ -147,7 +141,12 @@ resourcestring
   RS_HINT_COMPLETE = 'Выполнено за: ';
 
 type
+
+  TvpInterval = class;
+
   TvpGantt = class;
+
+  TvpIntervalList = specialize TFPGObjectList<TvpInterval>;
 
   { TvpBaseInterval }
 
@@ -160,10 +159,12 @@ type
     FFinishDate: TDateTime;
     FStartDate: TDateTime;
     FDuration: Double;
+    FTag: integer;
   public
-    property Name : string read FName write FName;
-    property Project : string read FProject write FProject;
-    property Resource : string read FResource write FResource;
+    property Name: string read FName write FName;
+    property Project: string read FProject write FProject;
+    property Resource: string read FResource write FResource;
+    property Tag: integer read FTag write FTag;
   end;
 
   { TvpInterval }
@@ -173,6 +174,7 @@ type
       FvpGantt: TvpGantt;
       FPlanRect: TRect;  //область планируемого времени
       FFactRect: TRect;  //область фактического времени
+      FGroup: boolean;   //группа
       function GetComplete: Double;
       function GetFinishDate: TDateTime;
       procedure SetDuration(AValue: Double);
@@ -193,6 +195,7 @@ type
       property FinishDate: TDateTime read GetFinishDate write SetFinishDate;
       property Duration: Double read FDuration write SetDuration;
       property Complete: Double read GetComplete;
+      property Group: Boolean read FGroup write FGroup default false;
   end;
 
   { TvpGanttTasks }
@@ -216,7 +219,6 @@ type
       procedure CalcTasksHeight;
       procedure CalcScrollbarsRange;
       function GetTitleRect: TRect;
-      procedure VisualChange; virtual;
       procedure UpdateSizes;
       //messages
       procedure WMSize(var Message: TLMSize); message LM_SIZE;
@@ -270,6 +272,7 @@ type
       FColor: TColor;
       FFreeColor: TColor;
       FExpiredColor: TColor;
+      FCurTimeLineRect: TRect;
       //scrollbars
       FHScrollPosition: integer;
       FVSbVisible: boolean;
@@ -281,6 +284,8 @@ type
       function CalcFocusRect: TRect;
       function CalcRowRect(const aRow: integer): TRect;
       procedure CalcScaleCount;
+      procedure CalcCurrentTimeRect;
+      function CurDateInRange: boolean;
       function GetMajorScaleHeight: integer;
       function GetMajorScaleWidth(const aCurItem: integer): integer;
       function GetMinorScaleHeight: integer;
@@ -296,10 +301,11 @@ type
       function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
       function DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean; override;
       function DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint): Boolean; override;
+      procedure DrawCurrentTimeLine;
       procedure DrawEdges;
+      procedure DrawInterval(const aRow: integer);
       procedure DrawMajorScale;
       procedure DrawMinorScale;
-      procedure DrawInterval(const aRow: integer);
       procedure DrawRow(const aRow: integer);
       procedure DrawRows;
       procedure DrawScaleVertLines(const X: integer);
@@ -317,9 +323,9 @@ type
       procedure ScrollBarPage(Which: Integer; aPage: Integer);
       procedure ScrollBarShow(Which: Integer; aValue: boolean);
       procedure ScrollToFocus;
+      procedure ScrollToCurTime;
       procedure UpdateHorzScrollBar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
       procedure UpdateVertScrollbar(const aVisible: boolean; const aRange,aPage,aPos: Integer);
-      procedure VisualChange; virtual;
       procedure WMHScroll(var message : TLMHScroll); message LM_HSCROLL;
       procedure WMVScroll(var message : TLMVScroll); message LM_VSCROLL;
     public
@@ -332,6 +338,7 @@ type
     private
       FDateFormat: String;
       FEndDate: TDate;
+      FGroupIntervalColor: TColor;
       FFactIntervalColor: TColor;
       FPlanIntervalColor: TColor;
       FFreeIntervalColor: TColor;
@@ -349,7 +356,7 @@ type
       FMouseInterval: integer;
       FSavedHint: string;
 
-      FIntervals: TList;
+      FIntervals: TvpIntervalList;
       FStartDateOfBound: TDateTime;
       FEndDateOfBound: TDateTime;
 
@@ -371,14 +378,14 @@ type
       FTitleTextStyle: TTextStyle;
       FFocusRow: integer;
       //methods
-      procedure ClearDates;
+      procedure ClearBoundDates;
       function GetCalendarColor: TColor;
       function GetIntervalCount: Integer;
       function GetInterval(AnIndex: Integer): TvpInterval;
       function GetBorderWidth: integer;
       function GetHorzBorderWidth: integer;
       function GetVertBorderWidth: integer;
-      function GetIntervalIndex: integer;
+      function GetSelectedIndex: integer;
       function GetMajorScale: TvpTimeScale;
       function GetMinorScale: TvpTimeScale;
       function GetPixelPerMinorScale: integer;
@@ -392,6 +399,7 @@ type
       procedure SetFactIntervalColor(AValue: TColor);
       procedure SetFocusColor(AValue: TColor);
       procedure SetFreeIntervalColor(AValue: TColor);
+      procedure SetGroupIntervalColor(AValue: TColor);
       procedure SetMajorScale(AValue: TvpTimeScale);
       procedure SetMajorScaleHeight(AValue: integer);
       procedure SetMinorScale(AValue: TvpTimeScale);
@@ -420,6 +428,8 @@ type
       procedure CutBorderFromRect(var aRect: TRect);
       procedure CutHBorderFromRect(var aRect: TRect);
       procedure CutVBorderFromRect(var aRect: TRect);
+      procedure DoClick(Sender: TObject);
+      procedure DoDblClick(Sender: TObject);
       procedure DrawCellGrid(ACanvas: TCanvas; const aRect: TRect);
       procedure DrawCell(aRow: integer; ACanvas: TCanvas; const aRect: TRect);
       procedure DrawFocusRect(ACanvas: TCanvas; const aRect: TRect);
@@ -460,7 +470,7 @@ type
       destructor Destroy; override;
       //property
       property Interval[Index: Integer]: TvpInterval read GetInterval;
-      property IntervalIndex: integer read GetIntervalIndex;
+      property SelectedIndex: integer read GetSelectedIndex;
       property IntervalCount: Integer read GetIntervalCount;
       procedure AddInterval(AnInterval: TvpInterval);
       procedure InsertInterval(AnIndex: Integer; AnInterval: TvpInterval);
@@ -474,6 +484,8 @@ type
       procedure RecalcIntervals;
       procedure UpdateDates;
       function Focused: boolean; override;
+      procedure Repaint; override;
+      procedure ScrollToCurTime;
 
       procedure BeginUpdate;
       procedure EndUpdate(aRefresh: boolean = true);
@@ -488,6 +500,8 @@ type
       property Align;
       property BorderStyle;
       property BorderWidth;
+      property ShowHint;
+      property Visible;
       //events
       property OnClick;
       property OnDblClick;
@@ -498,6 +512,7 @@ type
       property OnMouseDown;
       property OnMouseMove;
       property OnMouseUp;
+      property OnShowHint;
       //custom property
       property BorderColor: TColor read FBorderColor write SetBorderColor default clActiveBorder;
       property EndDate: TDate read FEndDate write SetEndDate;
@@ -519,8 +534,9 @@ type
       property TaskColor: TColor read GetTaskColor write SetTaskColor default clWindow;
       property TitleColor: TColor read FTitleColor write SetTitleColor default clBtnFace;
       property TaskTitleCaption: TCaption read GetTaskTitleCaption write SetTaskTitleCaption;
-      property PlanIntervalColor: TColor read FPlanIntervalColor write SetPlanIntervalColor default clSkyBlue;
-      property FactIntervalColor: TColor read FFactIntervalColor write SetFactIntervalColor default clBlue;
+      property GroupIntervalColor: TColor read FGroupIntervalColor write SetGroupIntervalColor default cl3DLight;
+      property PlanIntervalColor: TColor read FPlanIntervalColor write SetPlanIntervalColor default clAqua;
+      property FactIntervalColor: TColor read FFactIntervalColor write SetFactIntervalColor;
       property FreeIntervalColor: TColor read FFreeIntervalColor write SetFreeIntervalColor default clLime;
       property ExpiredIntervalColor: TColor read FExpiredIntervalColor write SetExpiredIntervalColor default clRed;
   end;
@@ -531,16 +547,17 @@ type
   procedure FreeWorkingCanvas(canvas: TCanvas);
   //timescale
   function UnitsBetweenDates(Start, Finish: TdateTime; TimeScale: TvpTimeScale): Double;
-  function UnitsBetweenDatesEx(Start, Finish: TdateTime; TimeScale: TvpTimeScale): Double;
+  function UnitsBetweenDatesEx(Start, Finish: TdateTime; TimeScale: TvpTimeScale): Double; deprecated;
   function GetTimeScaleName(TimeScale: TvpTimeScale; D: TDateTime): String;
   function IncTime(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Integer): TDateTime;
-  function IncTimeEx(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Double): TDateTime;
+  function IncTimeEx(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Double): TDateTime; deprecated;
+  function DateInPeriod(const CurDate, StartPeriod, EndPeriod: TDateTime): boolean;
 
 implementation
 
+{$if Defined(DBGGANTT) OR Defined(DBGGANTTTASKS) OR Defined(DBGGANTTCALENDAR)}
 uses Unit1;
 
-{$if Defined(DBGGANTT) OR Defined(DBGGANTTTASKS) OR Defined(DBGGANTTCALENDAR)}
 function SbToStr(Which: Integer): string;
 begin
   case Which of
@@ -851,6 +868,14 @@ begin
   end;
 end;
 
+{ Функция сдвига времени на нужный интервал. С приведением даты к юникосовскому
+  формату
+  @param D TDateTime текущее время
+  @param TimeScale TvpTimeScale шкала времени
+  @param IncAmount integer число деленний для сдвига
+  @return TDateTime полученное после сдвига время
+}
+{$WARNINGS OFF}
 function IncTimeEx(D: TDateTime; TimeScale: TvpTimeScale; IncAmount: Double): TDateTime;
 var
   S: TTimeStamp;
@@ -989,15 +1014,24 @@ begin
 
   Result := TimeStampToDateTime(S);
 end;
+{$WARNINGS ON}
+
+{ Функция определения вхождения даты в заданный период
+  @param CurDate TDateTime текущее время
+  @param StartPeriod TDateTime начало периода
+  @param EndPeriod TDateTime конец периода
+  @return boolean истина/ложь
+}
+function DateInPeriod(const CurDate, StartPeriod, EndPeriod: TDateTime): boolean;
+begin
+  Result := (CurDate>=StartPeriod) AND (CurDate<=EndPeriod);
+end;
 
 
 { TvpInterval }
 
 procedure TvpInterval.SetStartDate(AValue: TDateTime);
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.SetStartDate');
-  {$endif}
   if FStartDate = AValue then Exit;
   if (FFinishDate<>0) AND (AValue>FFinishDate) then
     Raise Exception.Create(RS_E_STARTDATE_HIGH);
@@ -1008,9 +1042,6 @@ end;
 
 procedure TvpInterval.SetBoundHeight(const ATop, ABottom: integer);
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.SetFinishDate');
-  {$endif}
   FPlanRect.Top := ATop;
   FPlanRect.Bottom := ABottom;
   //отсекаем лишнее по высоте
@@ -1024,9 +1055,6 @@ end;
 
 procedure TvpInterval.SetFinishDate(AValue: TDateTime);
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.SetFinishDate');
-  {$endif}
   if FFinishDate = AValue then
     Exit;
   if AValue<FStartDate then
@@ -1038,9 +1066,6 @@ end;
 
 procedure TvpInterval.SetDuration(AValue: Double);
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.SetDuration');
-  {$endif}
   if FDuration = AValue then
     Exit;
   FDuration := AValue;
@@ -1050,9 +1075,6 @@ end;
 
 function TvpInterval.GetFinishDate: TDateTime;
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.GetFinishDate');
-  {$endif}
   if FFinishDate=0 then
     Result := FStartDate + FDuration
   else
@@ -1061,9 +1083,6 @@ end;
 
 function TvpInterval.GetComplete: Double;
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.GetFinishDate');
-  {$endif}
   if FFinishDate=0 then
     Result := 0
   else
@@ -1078,9 +1097,8 @@ procedure TvpInterval.CalcPlanBound;
 var
   countTimeScale: double;
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.CalcLeftPlanBound');
-  {$endif}
+  if FGroup then Exit;
+  //иначе расчитываем область
   countTimeScale := UnitsBetweenDates(FvpGantt.GetStartDateOfBound, FStartDate, FvpGantt.MinorScale);
   FPlanRect.Left := Trunc(countTimeScale * FvpGantt.PixelPerMinorScale);
   if FDuration>0 then
@@ -1090,9 +1108,6 @@ begin
     end
   else
     FPlanRect.Width := 0;
-  {$ifdef DBGINTERVAL}
-  Form1.EL.Debug('FPlanRect LTRB %d %d %d %d', [FPlanRect.Left, FPlanRect.Top, FPlanRect.Right, FPlanRect.Bottom]);
-  {$endif}
 end;
 
 { Процедура расчета области фактической длительности интервала
@@ -1102,9 +1117,8 @@ procedure TvpInterval.CalcFactBound;
 var
   countTimeScale: Double;
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.CalcRightDueBound');
-  {$endif}
+  if FGroup then Exit;
+  //иначе расчитываем область
   if FFinishDate>FStartDate then
     begin
       FFactRect.Left := FPlanRect.Left;
@@ -1113,43 +1127,28 @@ begin
     end;
   if FDuration=0 then
     FPlanRect.Right := FFactRect.Right;
-  {$ifdef DBGINTERVAL}
-  Form1.EL.Debug('FDurationRect LTRB %d %d %d %d', [FDurationRect.Left, FDurationRect.Top, FDurationRect.Right, FDurationRect.Bottom]);
-  {$endif}
 end;
 
-{ Конструктор
-}
 constructor TvpInterval.Create(AvpGantt: TvpGantt);
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.Create');
-  {$endif}
   FvpGantt := AvpGantt;
   //initialize
   FPlanRect := Rect(0, 0, 0, 0);
   FFactRect := Rect(0, 0, 0, 0);
+  FGroup := false;
   //dates
   FStartDate := 0;
   FFinishDate := 0;
   FDuration := 0;
 end;
 
-{ Разрушитель :)
-}
 destructor TvpInterval.Destroy;
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.Destroy');
-  {$endif}
   inherited Destroy;
 end;
 
 function TvpInterval.IsExpired: boolean;
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.IsExpired');
-  {$endif}
   Result := FFinishDate > (FStartDate + FDuration);
 end;
 
@@ -1159,20 +1158,15 @@ end;
 }
 procedure TvpInterval.UpdateBounds;
 begin
-  {$ifdef DBGINTERVAL}
-  Form1.Debug('TvpInterval.UpdateBounds');
-  {$endif}
   CalcPlanBound;
   CalcFactBound;
 end;
+
 
 { TvpGanttCalendar }
 
 procedure TvpGanttCalendar.ScrollBarShow(Which: Integer; aValue: boolean);
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.ScrollBarShow');
-  {$endif}
   if HandleAllocated then begin
     ShowScrollBar(Handle,Which,aValue);
     if Which in [SB_BOTH, SB_VERT] then FVSbVisible := AValue else
@@ -1182,14 +1176,12 @@ end;
 
 procedure TvpGanttCalendar.ScrollToFocus;
 var
-  curPos: integer;
+  oldPos, curPos: integer;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.ScrollToFocusRect');
-  {$EndIf}
   curPos := GetScrollPos(Handle, SB_VERT);
+  oldPos := curPos;
   //если нижняя граница области рисования фокуса ниже низа клиентской области
-  //то прокручиваем на ширину строки
+  //то прокручиваем на разницу между грfницами фокуса
   if TvpGantt(Parent).FFocusRect.Bottom>ClientHeight then
     begin
       curPos := curPos + TvpGantt(Parent).FFocusRect.Bottom - ClientRect.Bottom;
@@ -1201,16 +1193,41 @@ begin
   else if TvpGantt(Parent).FFocusRect.Top<FGridVisibleRect.Top then
     begin
       curPos := curPos + TvpGantt(Parent).FFocusRect.Top - FGridVisibleRect.Top;
-      //не должно быть отрицательным, т.е. если сдвинуты на пол строки и дошли до последней, то крутатнуть надо до 0,
+      //не должно быть отрицательным, т.е. если сдвинуты на пол строки и дошли до первой, то крутатнуть надо до 0,
       //а никак не в отрицательную позицию
       curPos := Max(0, curPos);
     end;
-  //шлем сообщение о прокрутке на нужную величину
-  SendMessage(Handle, LM_VSCROLL, MakeWParam(SB_THUMBPOSITION, curPos), 0);
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.El.Debug('FFocusRow %d  curPos %d  FFocusRect.Bottom %d ClientRect.Bottom %d FFocusRect.Top %d ClientRect.Top - FvpGantt.GetTitleHeight %d',
-                 [FvpGantt.FFocusRow, curPos, FvpGantt.FFocusRect.Bottom, ClientRect.Bottom, FvpGantt.FFocusRect.Top, ClientRect.Top - FvpGantt.GetTitleHeight]);
-  {$EndIf}
+  //если позиция ползунка изменилась, то перерисовываем все
+  //иначе перерисовываем только фокус
+  if curPos<>oldPos then
+    begin
+      ScrollBarPosition(SB_VERT, curPos);
+      TvpGantt(Parent).FVScrollPosition := curPos;
+      TvpGantt(Parent).Invalidate;
+    end
+  else
+    TvpGantt(Parent).InvalidateFocused;
+end;
+
+procedure TvpGanttCalendar.ScrollToCurTime;
+var
+  curPos: integer;
+begin
+  if not CurDateInRange then
+    Exit;
+  //считаем
+  CalcCurrentTimeRect;
+  curPos := FCurTimeLineRect.Left;
+  //если не видим, иначе выходим
+  if (curPos>ClientWidth) then
+    FHScrollPosition := FCurTimeLineRect.Left - ClientWidth div 2
+  else if (curPos<0) AND (FHScrollPosition>0) then
+    FHScrollPosition := FCurTimeLineRect.Left + FHScrollPosition - ClientWidth div 2
+  else
+    Exit;
+  //прокручиваем до нужного места
+  ScrollBarPosition(SB_HORZ, FHScrollPosition);
+  Invalidate;
 end;
 
 function TvpGanttCalendar.CalcRowRect(const aRow: integer): TRect;
@@ -1218,17 +1235,13 @@ var
   aStart: integer;
   tmpRect: TRect;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.CalcRowRect');
-  {$EndIf}
-  Result := TRect.Create(0,0,0,0);
+  Result := TRect.Create(0, 0, 0, 0);
   aStart := TvpGantt(Parent).GetTitleHeight +
             TvpGantt(Parent).RowHeight * aRow - TvpGantt(Parent).FVScrollPosition;
   //находим всю длину строки
   tmpRect := Rect(0 - FHScrollPosition, aStart,
                  FCalendarWidth - FHScrollPosition, aStart + TvpGantt(Parent).RowHeight);
   //обрезаем невидимые части
-  {DONE -o Vas Пофиксить обрезку части строки внизу, иначе выводится черти-что}
   IntersectRect(Result, tmpRect, FGridVisibleRect);
 end;
 
@@ -1237,9 +1250,6 @@ var
   i: integer;
   aSDate, aEDate: TDateTime;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.CalcScale');
-  {$endif}
   if (TvpGantt(Parent).FStartDateOfBound=0) OR (TvpGantt(Parent).FEndDateOfBound=0) then
     Exit;
   FMajorScaleCount := Round(UnitsBetweenDates(TvpGantt(Parent).FStartDateOfBound, TvpGantt(Parent).FEndDateOfBound, FMajorScale));
@@ -1264,58 +1274,57 @@ begin
       for i:=0 to FMajorScaleCount-1 do
         FMinorCountInMajor[i] := FMinorScaleCount div FMinorScaleCount;
     end;
+end;
 
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.EL.Debug('Major scale count %d', [FMajorScaleCount]);
-  Form1.EL.Debug('Minor scale count %d', [FMinorScaleCount]);
-  {$endif}
+procedure TvpGanttCalendar.CalcCurrentTimeRect;
+var
+  timePadding: Double;
+begin
+  if DateInPeriod(Now, TvpGantt(Parent).FStartDateOfBound, TvpGantt(Parent).FEndDateOfBound) then
+    begin
+      timePadding := UnitsBetweenDates(TvpGantt(Parent).FStartDateOfBound, Now, FMinorScale);
+      FCurTimeLineRect.Left := Trunc(timePadding * TvpGantt(Parent).PixelPerMinorScale) - FHScrollPosition;
+      //верх, если titleStyle tsNative то -1 надо сделать, а то неприятный зазор
+      FCurTimeLineRect.Top := TvpGantt(Parent).GetTitleHeight;
+      if TvpGantt(Parent).FTitleStyle = tsNative then
+        dec(FCurTimeLineRect.Top);
+      //рисуем до конца видимой части компонента или до конца списка
+      if vpgExtendVertLines in TvpGantt(Parent).Options then
+        FCurTimeLineRect.Bottom := ClientHeight
+      else
+        FCurTimeLineRect.Bottom := FCalendarHeight;
+    end
+  else
+    FCurTimeLineRect := Rect(0,0,0,0);
+end;
+
+function TvpGanttCalendar.CurDateInRange: boolean;
+begin
+  Result := DateInPeriod(Now, TvpGantt(Parent).FStartDateOfBound, TvpGantt(Parent).FEndDateOfBound);
 end;
 
 procedure TvpGanttCalendar.CalcCalendarHeight;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.CalcCalendarHeight');
-  Form1.El.Debug('FvpGantt.IntervalCount=%d FvpGantt.GetIntervalsHeight=%d', [FvpGantt.IntervalCount, FvpGantt.GetIntervalsHeight]);
-  {$endif}
   FCalendarHeight := TvpGantt(Parent).GetTitleHeight + TvpGantt(Parent).GetIntervalsHeight;
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.El.Debug('FCalendarHeight %d', [FCalendarHeight]);
-  {$endif}
 end;
 
 procedure TvpGanttCalendar.CalcCalendarWidth;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.CalcCalendarWidth');
-  {$endif}
   FCalendarWidth := FMinorScaleCount * FPixelePerMinorScale;
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.El.Debug('FCalendarWidth %d', [FCalendarWidth]);
-  {$endif}
 end;
 
 procedure TvpGanttCalendar.CalcGridVisibleRect;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.CalcGridVisibleRect');
-  {$endif}
   //рассчитываем область
   FGridVisibleRect := ClientRect;
   InflateRect(FGridVisibleRect, -1, 0);
   FGridVisibleRect.Top := ClientRect.Top + TvpGantt(Parent).GetTitleHeight;
   FGridVisibleRect.Width := Min(FCalendarWidth - FHScrollPosition, ClientWidth);
   FGridVisibleRect.Height := Ceil(ClientHeight / TvpGantt(Parent).RowHeight)* TvpGantt(Parent).RowHeight;
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.EL.Debug('FGridVisibleRect Left %d Top %d Right %d Bottom %d',
-                  [FGridVisibleRect.Left, FGridVisibleRect.Top, FGridVisibleRect.Right, FGridVisibleRect.Bottom]);
-  {$ENDIF}
 end;
 
 function TvpGanttCalendar.CalcFocusRect: TRect;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.CalcFocusRect');
-  {$endif}
   Result := TvpGantt(Parent).FFocusRect;
   Result.Left := FGridVisibleRect.Left;
   Result.Right := Result.Right + FCalendarWidth;
@@ -1325,17 +1334,11 @@ end;
 
 function TvpGanttCalendar.GetMajorScaleHeight: integer;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.GetMajorScaleHeight');
-  {$endif}
   Result := FMajorScaleTitleRect.Height;
 end;
 
 function TvpGanttCalendar.GetMajorScaleWidth(const aCurItem: integer): integer;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.GetMajorScaleWidth');
-  {$endif}
   if aCurItem>=FMajorScaleCount then
     Result := 0
   else
@@ -1344,17 +1347,11 @@ end;
 
 function TvpGanttCalendar.GetMinorScaleHeight: integer;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.GetMinorScaleHeight');
-  {$endif}
   Result := FMinorScaleTitleRect.Height;
 end;
 
 function TvpGanttCalendar.GetMinorScaleWidth: integer;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.GetMinorScaleWidth');
-  {$endif}
   Result := FPixelePerMinorScale;
 end;
 
@@ -1362,9 +1359,6 @@ procedure TvpGanttCalendar.UpdateSBVisibility;
 var
   HSbVisible, VSbVisible: boolean;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.UpdateSBVisibility');
-  {$endif}
   GetSBVisibility(HSbVisible, VSbVisible);
   ScrollBarShow(SB_VERT, VSbVisible);
   ScrollBarShow(SB_HORZ, HSbVisible);
@@ -1372,9 +1366,6 @@ end;
 
 procedure TvpGanttCalendar.UpdateSizes;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.UpdateSizes');
-  {$endif}
   FGridTextHeight := Canvas.GetTextHeight('A');
   CalcCalendarHeight;
   CalcCalendarWidth;
@@ -1382,29 +1373,11 @@ begin
   //и ширина сетки - скролл горизонтальный < клиентской области
   //текущую позицию сдвига уменьшаем на разницу между шириной клиентской области и видимой области сетки
   if (FHScrollPosition>0) AND (FCalendarWidth-FHScrollPosition<ClientWidth) then
-    begin
-      FHScrollPosition := Max(0, FHScrollPosition - (ClientWidth - FGridVisibleRect.Width));
-      {$ifdef DBGSCROLL}
-      Form1.Debug('FCalendarWidth-FHScrollPosition<ClientWidth');
-      Form1.EL.Debug('FHScrollPosition %d FCalendarWidth %d ClientWidth %d - FGridVisibleRect.Right %d ClientRect.Right %d',
-                      [FHScrollPosition, FCalendarWidth, ClientWidth, FGridVisibleRect.Right, ClientRect.Right]);
-      {$endif}
-    end;
+    FHScrollPosition := Max(0, FHScrollPosition - (ClientWidth - FGridVisibleRect.Width));
   //пересчитываем видимую область
   CalcScrollbarsRange;
   CalcGridVisibleRect;
-end;
-
-procedure TvpGanttCalendar.VisualChange;
-begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.EL.Debug('TvpGanttCalendar.VisualChange INIT %s',[DbgSName(Self)]);
-  {$endif}
-  UpdateSizes;
-  Invalidate;
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.EL.Debug('TvpGanttCalendar.VisualChange END %s',[DbgSName(Self)]);
-  {$endif}
+  CalcCurrentTimeRect;
 end;
 
 procedure TvpGanttCalendar.WMHScroll(var message: TLMHScroll);
@@ -1413,9 +1386,6 @@ var
   ScrollInfo: TScrollInfo;
   aCode: Smallint;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.WMHScroll');
-  {$endif}
   if not HandleAllocated then
     exit;
 
@@ -1430,10 +1400,7 @@ begin
   aCode := message.ScrollCode;
   aPos := ScrollInfo.nPos;
 
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug(Format('maxPos %d', [maxPos]));
-  Form1.Debug(Format('aPos %d', [aPos]));
-  {$endif}
+  //прокручиваем в зависимости от полученного сообщения
   case aCode of
     SB_LEFT:
       aPos := ScrollInfo.nMin;
@@ -1471,17 +1438,10 @@ begin
       Exit;
   end;
 
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug(Format('aPos %d', [aPos]));
-  {$endif}
-
+  //устанавливаем положение бара и запоминаем текущий сдвиг компонента
   ScrollBarPosition(SB_HORZ, aPos);
   FHScrollPosition := aPos;
-
-  {$ifdef DBGGANTTCALENDAR}
-  //Form1.Debug(Format('FScrollPosition %d', [FXScrollPosition]));
-  {$endif}
-
+  //перерисовываем
   Invalidate;
 end;
 
@@ -1491,9 +1451,6 @@ var
   ScrollInfo: TScrollInfo;
   aCode: Smallint;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.WMVScroll');
-  {$endif}
   if not HandleAllocated then
     exit;
 
@@ -1508,10 +1465,7 @@ begin
   aCode := message.ScrollCode;
   aPos := ScrollInfo.nPos;
 
-  {$ifdef DBGSCROLL}
-  Form1.Debug(Format('maxPos %d', [maxPos]));
-  Form1.Debug(Format('aPos %d', [aPos]));
-  {$endif}
+  //прокручиваем в зависимости от полученного сообщения
   case aCode of
     SB_LEFT:
       aPos := ScrollInfo.nMin;
@@ -1549,27 +1503,15 @@ begin
       Exit;
   end;
 
-  {$ifdef DBGSCROLL}
-  Form1.Debug(Format('aPos %d', [aPos]));
-  {$endif}
-
+  //устанавливаем положение бара и запоминаем текущий сдвиг компонента
   ScrollBarPosition(SB_VERT, aPos);
   TvpGantt(Parent).FVScrollPosition := aPos;
-
-  {$ifdef DBGSCROLL}
-  //Form1.Debug(Format('FVScrollPosition %d', [FVScrollPosition]));
-  {$endif}
-
-  //FvpGantt.CalcFocusRect;
+  //перерисовываем
   TvpGantt(Parent).Repaint;
 end;
 
 procedure TvpGanttCalendar.WMSize(var Message: TLMSize);
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.WMSize');
-  Form1.EL.Debug('IsResizing %d', [Integer(IsResizing)]);
-  {$endif}
   if not IsResizing then
     begin
       UpdateSizes;
@@ -1584,9 +1526,6 @@ var
   HsbPage, VsbPage: Integer;
   HsbPos, VsbPos: Integer;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.CalcScrollbarsRange');
-  {$endif}
   GetSBVisibility(HsbVisible, VsbVisible);
   GetSBRanges(HsbVisible, VsbVisible, HsbRange, VsbRange, HsbPage, VsbPage, HsbPos, VsbPos);
   UpdateVertScrollBar(VsbVisible, VsbRange, VsbPage, VsbPos);
@@ -1598,27 +1537,21 @@ procedure TvpGanttCalendar.ScrollBarRange(Which: Integer; aRange, aPage,
 var
   ScrollInfo: TScrollInfo;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.ScrollBarRange');
-  {$endif}
-  if HandleAllocated then begin
-    {$ifdef DBGGANTTCALENDAR}
-    Form1.EL.Debug('ScrollbarRange: Which=%s Range=%d Page=%d Pos=%d',
-      [SbToStr(Which), aRange, aPage, aPos]);
-    {$endif}
-    FillChar(ScrollInfo, SizeOf(ScrollInfo), 0);
-    ScrollInfo.cbSize := SizeOf(ScrollInfo);
-    ScrollInfo.fMask := SIF_RANGE or SIF_PAGE or SIF_DISABLENOSCROLL;
-    //if not (gfPainting in FGridFlags) then
-    //  ScrollInfo.fMask := ScrollInfo.fMask or SIF_POS;
-    ScrollInfo.nMin := 0;
-    ScrollInfo.nMax := aRange;
-    ScrollInfo.nPos := aPos;
-    if APage<0 then
-      APage := 0;
-    ScrollInfo.nPage := APage;
-    SetScrollInfo(Handle, Which, ScrollInfo, True);
-  end;
+  if HandleAllocated then
+    begin
+      FillChar(ScrollInfo, SizeOf(ScrollInfo), 0);
+      ScrollInfo.cbSize := SizeOf(ScrollInfo);
+      ScrollInfo.fMask := SIF_RANGE or SIF_PAGE or SIF_DISABLENOSCROLL;
+      //if not (gfPainting in FGridFlags) then
+      //  ScrollInfo.fMask := ScrollInfo.fMask or SIF_POS;
+      ScrollInfo.nMin := 0;
+      ScrollInfo.nMax := aRange;
+      ScrollInfo.nPos := aPos;
+      if APage<0 then
+        APage := 0;
+      ScrollInfo.nPage := APage;
+      SetScrollInfo(Handle, Which, ScrollInfo, True);
+    end;
 end;
 
 procedure TvpGanttCalendar.ScrollBarPosition(Which, Value: integer);
@@ -1626,29 +1559,21 @@ var
   ScrollInfo: TScrollInfo;
   Vis: Boolean;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.ScrollBarPosition');
-  {$endif}
-  if HandleAllocated then begin
-    {$ifdef DBGGANTTCALENDAR}
-    Form1.EL.Debug('ScrollbarPosition: Which= %s Value= %d', [SbToStr(Which), Value]);
-    {$endif}
-    if Which = SB_VERT then Vis := FVSbVisible else
-    if Which = SB_HORZ then Vis := FHSbVisible
-    else vis := false;
-    FillChar(ScrollInfo, SizeOf(ScrollInfo), 0);
-    ScrollInfo.cbSize := SizeOf(ScrollInfo);
-    ScrollInfo.fMask := SIF_POS;
-    ScrollInfo.nPos:= Value;
-    SetScrollInfo(Handle, Which, ScrollInfo, Vis);
-  end;
+  if HandleAllocated then
+    begin
+      if Which = SB_VERT then Vis := FVSbVisible else
+      if Which = SB_HORZ then Vis := FHSbVisible
+      else vis := false;
+      FillChar(ScrollInfo, SizeOf(ScrollInfo), 0);
+      ScrollInfo.cbSize := SizeOf(ScrollInfo);
+      ScrollInfo.fMask := SIF_POS;
+      ScrollInfo.nPos:= Value;
+      SetScrollInfo(Handle, Which, ScrollInfo, Vis);
+    end;
 end;
 
 function TvpGanttCalendar.ScrollBarIsVisible(Which: Integer): Boolean;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.ScrollBarIsVisible');
-  {$endif}
   Result:=false;
   if HandleAllocated then begin
     {$IFNDEF MSWINDOWS}
@@ -1668,13 +1593,7 @@ procedure TvpGanttCalendar.ScrollBarPage(Which: Integer; aPage: Integer);
 var
   ScrollInfo: TScrollInfo;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.ScrollBarPage');
-  {$endif}
   if HandleAllocated then begin
-    {$ifdef DBGGANTTCALENDAR}
-    Form1.EL.Debug('ScrollbarPage: Which= %s Avalue=%s', [SbToStr(Which), dbgs(aPage)]);
-    {$endif}
     ScrollInfo.cbSize := SizeOf(ScrollInfo);
     ScrollInfo.fMask := SIF_PAGE;
     ScrollInfo.nPage:= aPage;
@@ -1685,10 +1604,6 @@ end;
 procedure TvpGanttCalendar.UpdateHorzScrollBar(const aVisible: boolean;
   const aRange, aPage, aPos: Integer);
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.EL.Debug('TvpGanttCalendar.UpdateHorzScrollbar: Vis=%s Range=%d Page=%d aPos=%d',
-    [dbgs(aVisible),aRange, aPage, aPos]);
-  {$endif}
   ScrollBarShow(SB_HORZ, aVisible);
   if aVisible then
     ScrollBarRange(SB_HORZ, aRange, aPage, aPos);
@@ -1697,10 +1612,6 @@ end;
 procedure TvpGanttCalendar.UpdateVertScrollbar(const aVisible: boolean;
   const aRange, aPage, aPos: Integer);
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.EL.Debug('TvpGanttCalendar.UpdateVertScrollbar: Vis=%s Range=%d Page=%d aPos=%d',
-    [dbgs(aVisible),aRange, aPage, aPos]);
-  {$endif}
   ScrollBarShow(SB_VERT, aVisible);
   if aVisible then
     ScrollbarRange(SB_VERT, aRange, aPage, aPos );
@@ -1710,10 +1621,8 @@ procedure TvpGanttCalendar.CreateParams(var Params: TCreateParams);
 const
   ClassStylesOff = CS_VREDRAW or CS_HREDRAW;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.CreateParams');
-  {$endif}
   inherited CreateParams(Params);
+  //добавляем в параметры создания окна вертикальный и горизонтальный скроллбары
   with Params do begin
     WindowClass.Style := WindowClass.Style and DWORD(not ClassStylesOff);
     Style := Style or WS_VSCROLL or WS_HSCROLL or WS_CLIPCHILDREN;
@@ -1722,29 +1631,20 @@ end;
 
 procedure TvpGanttCalendar.ClearCanvas;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.ClearCanvas');
-  {$endif}
   Canvas.Brush.Color := TvpGantt(Parent).CalendarColor;
   Canvas.FillRect(ClientRect);
 end;
 
+
 function TvpGanttCalendar.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
   MousePos: TPoint): Boolean;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.DoMouseWheel');
-  {$endif}
-  Form1.ShowParam(IntToStr(WheelDelta));
   Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
 end;
 
 function TvpGanttCalendar.DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint
   ): Boolean;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.DoMouseWheelDown');
-  {$endif}
   Result := inherited DoMouseWheelDown(Shift, MousePos);
   if not Result then
     begin
@@ -1756,9 +1656,6 @@ end;
 function TvpGanttCalendar.DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint
   ): Boolean;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.DoMouseWheelUp');
-  {$endif}
   Result := inherited DoMouseWheelUp(Shift, MousePos);
   if not Result then
     begin
@@ -1767,18 +1664,37 @@ begin
     end;
 end;
 
+procedure TvpGanttCalendar.DrawCurrentTimeLine;
+var
+  aPenPattern: TPenPattern;
+begin
+  if not (vpgShowCurrentTime in TvpGantt(Parent).Options) then
+    Exit;
+  //рассчитывваем, чтобы изменить текущее время
+  CalcCurrentTimeRect;
+  if FCurTimeLineRect.Height>0 then
+    begin
+      Canvas.Pen.Style := psPattern;
+      SetLength(aPenPattern, 2);
+      aPenPattern[0] := C_CURTIMELINE_SOLID;
+      aPenPattern[1] := C_CURTIMELINE_CLEAR;
+      Canvas.Pen.SetPattern(aPenPattern);
+      Canvas.Pen.Width := C_CURTIMELINE_WIDTH;
+      Canvas.Pen.Color := C_CURTIMELINE_COLOR;
+      Canvas.Line(FCurTimeLineRect.Left, FCurTimeLineRect.Top, FCurTimeLineRect.Left, FCurTimeLineRect.Bottom - 1);
+      SetLength(aPenPattern, 0);
+    end;
+end;
+
 procedure TvpGanttCalendar.DrawEdges;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.DrawEdges');
-  {$endif}
   Canvas.Pen.Width := C_DEF_BORDER_WIDTH;
   Canvas.Pen.Style := psSolid;
   Canvas.Pen.Color := clActiveBorder;
   Canvas.MoveTo(0, TvpGantt(Parent).GetTitleHeight);
   Canvas.LineTo(0, ClientRect.Bottom - 1);
   Canvas.LineTo(ClientRect.Right - 1, ClientRect.Bottom - 1);
-  Canvas.LineTo(ClientRect.Right - 1, TvpGantt(Parent).GetTitleHeight);
+  Canvas.LineTo(ClientRect.Right - 1, TvpGantt(Parent).GetTitleHeight - 1);
 end;
 
 
@@ -1788,12 +1704,14 @@ var
   aScaleName: string;
   i: integer;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.DrawMajorScale');
-  {$endif}
   //берем нулевую область для старта
   aRect := Rect(0, 0, 0, TvpGantt(Parent).MajorScaleHeight);
   aRect.Offset( - FHScrollPosition, 0);
+  //шрифт
+  if not TvpGantt(Parent).FTitleFontIsDefault then
+    Canvas.Font.Assign(TvpGantt(Parent).TitleFont)
+  else
+    Canvas.Font := Font;
   //перебираем все мажорные диапазоны
   for i:=0 to FMajorScaleCount-1 do
     begin
@@ -1821,13 +1739,15 @@ var
   i: integer;
   aScaleName: string;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.DrawMinorScale');
-  {$endif}
   //берем нулевую область для старта
   aRect := Rect(0, TvpGantt(Parent).MajorScaleHeight,
                 GetMinorScaleWidth, TvpGantt(Parent).MajorScaleHeight + TvpGantt(Parent).MinorScaleHeight);
   aRect.Offset( - FHScrollPosition, 0);
+  //шрифт
+  if not TvpGantt(Parent).FTitleFontIsDefault then
+    Canvas.Font.Assign(TvpGantt(Parent).TitleFont)
+  else
+    Canvas.Font := Font;
   //перебираем все мажорные диапазоны
   for i:=0 to FMinorScaleCount-1 do
     begin
@@ -1852,9 +1772,6 @@ var
   drawRect, expRect: TRect;
   curInterval: TvpInterval;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.DrawInterval');
-  {$endif}
   curInterval := TvpGantt(Parent).Interval[aRow];
   //смещаем скролл
   drawRect := TRect.Create(curInterval.FPlanRect);
@@ -1915,38 +1832,26 @@ var
   i: integer;
   Dv: boolean;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.DrawRow');
-  {$endif}
   if not Assigned(Parent) then
     Exit;
+  //ячейка
+  tmpRect := TRect.Create(0, 0, 0, 0);
   //область строки
   rowRect := CalcRowRect(aRow);
   aMinorScaleWidth := GetMinorScaleWidth;
   Dv := vpgVertLine in TvpGantt(Parent).Options;
-  {$ifdef DBGSCROLL}
-  Form1.EL.Debug('Calendar rRect.Left %d rRect.Top %d rRect.Right %d rRect.Bottom %d',
-                  [rowRect.Left, rowRect.Top, rowRect.Right, rowRect.Bottom]);
-  Form1.EL.Debug('FHScrollPosition %d, ClientWidth %d, FGridVisibleRect.Width %d, FCalendarWidth %d',
-                  [FHScrollPosition, ClientWidth, FGridVisibleRect.Width, FCalendarWidth]);
-  {$endif}
+  //шрифт
+  Canvas.Font := Font;
   if rowRect.Height>0 then
     begin
-      {$ifdef DBGGANTTCALENDAR}
-      Form1.EL.Debug('Drawing row %d', [aRow]);
-      {$endif}
       //нужно нарисовать строку по ячейкам старшей или младшей шкалы
       for i:=0 to FMinorScaleCount - 1 do
         begin
           //устанавливаем размер области = размеру области строки
-          cellRect := rowRect;
+          cellRect := TRect.Create(rowRect);
           //вычисляем с учетом сдвига, ширина будет равна FPixelePerMinorScale;
           cellRect.Left := aMinorScaleWidth * i - FHScrollPosition;
           cellRect.Right := cellRect.Left + aMinorScaleWidth;
-          {$ifdef DBGSCROLL}
-          Form1.EL.Debug('Before offset i %d cRect.Left %d cRect.Top %d cRect.Right %d cRect.Bottom %d',
-                          [i, cellRect.Left, cellRect.Top, cellRect.Right, cellRect.Bottom]);
-          {$endif}
           //пересекаем с видимой область строки и сохраняем результат во временную область
           //для проверки. А рисовать придется в полном прямоугольнике ячейки
           IntersectRect(tmpRect, cellRect, rowRect);
@@ -1954,8 +1859,10 @@ begin
           if tmpRect.Width>0 then
             begin
               TvpGantt(Parent).DrawCellGrid(Canvas, cellRect);
-              Canvas.Font := Font;
-              Canvas.Brush.Color := FColor;
+              if TvpGantt(Parent).FIntervals[aRow].Group then
+                Canvas.Brush.Color := TvpGantt(Parent).GroupIntervalColor
+              else
+                Canvas.Brush.Color := FColor;
               if Dv AND ([vpgMajorVertLine, vpgMinorVertLine]*TvpGantt(Parent).Options=[]) then
                 TvpGantt(Parent).CutVBorderFromRect(cellRect);
               //нижний бордюр срезаем всегда (ну в зависимости от установленного флага)
@@ -1973,9 +1880,6 @@ procedure TvpGanttCalendar.DrawRows;
 var
   i: integer;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.DrawRows');
-  {$endif}
   for i:=0 to TvpGantt(Parent).IntervalCount-1 do
     DrawRow(i);
 end;
@@ -2002,9 +1906,6 @@ var
   ClientW,ClientH: Integer;
   BarW,BarH: Integer;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.GetSBVisibility');
-  {$endif}
   AutoVert := TvpGantt(Parent).ScrollBarAutomatic(ssVertical);
   AutoHorz := TvpGantt(Parent).ScrollBarAutomatic(ssHorizontal);
 
@@ -2036,19 +1937,11 @@ begin
 
   if AutoHorz then
     HsbVisible := HsbVisible; // and not AutoFillColumns;
-
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.El.Debug('Horz=%d CalendarW=%d CW=%d BarW=%d', [Integer(HsbVisible), FCalendarWidth, ClientWidth, BarW]);
-  Form1.El.Debug('Vert=%d CalendarH=%d CH=%d BarH=%d', [Integer(VsbVisible), FCalendarHeight, ClientHeight, BarH]);
-  {$endif}
 end;
 
 procedure TvpGanttCalendar.GetSBRanges(const HsbVisible, VsbVisible: boolean;
   out HsbRange, VsbRange, HsbPage, VsbPage, HsbPos, VsbPos: Integer);
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.GetSBRanges');
-  {$endif}
   HsbRange := 0;
   HsbPos := 0;
   if HsbVisible then
@@ -2064,68 +1957,55 @@ begin
       VsbRange := FCalendarHeight;
       VsbPage := ClientHeight;
     end;
-
-  {$ifdef DBGSCROLL}
-  Form1.EL.Debug('GetSBRanges: HRange=%d HPage=%d HPos=%d VRange=%d VPage=%d VPos=%d',
-                 [HSbRange, HsbPage, HsbPos, VsbRange, VsbPage, VsbPos]);
-  {$endif}
 end;
 
 procedure TvpGanttCalendar.InvalidateRow(aRow: integer);
 var
   R: TRect;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.InvalidateRow');
-  {$endif}
   R := CalcRowRect(aRow);
   InvalidateRect(Handle, @R, true);
 end;
 
 procedure TvpGanttCalendar.MouseDown(Button: TMouseButton; Shift: TShiftState;
   X, Y: Integer);
+var
+  curPoint: TPoint;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.MouseDown');
-  {$endif}
-  TvpGantt(Parent).MouseDown(Button, Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseDown(Button, Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttCalendar.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  curPoint: TPoint;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.MouseMove');
-  {$endif}
-  TvpGantt(Parent).MouseMove(Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseMove(Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttCalendar.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
   Y: Integer);
+var
+  curPoint: TPoint;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.MouseUp');
-  {$endif}
-  TvpGantt(Parent).MouseUp(Button, Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseUp(Button, Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttCalendar.Paint;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.Paint');
-  {$endif}
   ClearCanvas;
   DrawRows;
   DrawMajorScale;
   DrawMinorScale;
+  DrawCurrentTimeLine;
   DrawEdges;
 end;
 
 constructor TvpGanttCalendar.Create(AOwner: TvpGantt);
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.Create');
-  {$endif}
-  inherited create(AOwner);
+  inherited Create(AOwner);
   Parent := AOwner;
 
   FHScrollPosition := 0;
@@ -2133,6 +2013,7 @@ begin
   FMajorScale := vptsMonth;
   FMinorScale := vptsDay;
   FPixelePerMinorScale := C_DEF_PIXEL_PER_MINOR;
+  FCurTimeLineRect := TRect.Create(0,0,0,0);
 
   //цвета
   FFreeColor := clLime;
@@ -2141,9 +2022,6 @@ end;
 
 destructor TvpGanttCalendar.Destroy;
 begin
-  {$ifdef DBGGANTTCALENDAR}
-  Form1.Debug('TvpGanttCalendar.Destroy');
-  {$endif}
   try
     SetLength(FMinorCountInMajor, 0);
   finally
@@ -2155,9 +2033,6 @@ end;
 
 procedure TvpGanttTasks.UpdateSizes;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.UpdateSizes');
-  {$endif}
   FGridTextHeight := Canvas.GetTextHeight('A');
   CalcTasksHeight;
   CalcTasksWidth;
@@ -2165,41 +2040,19 @@ begin
   //и ширина сетки - скролл горизонтальный < клиентской области
   //текущую позицию сдвига уменьшаем на разницу между шириной клиентской области и видимой области сетки
   if (FHScrollPosition>0) AND (FTasksWidth-FHScrollPosition<ClientWidth) then
-    begin
-      FHScrollPosition := Max(0, FHScrollPosition - (ClientWidth - FGridVisibleRect.Width));
-      {$ifdef DBGSCROLL}
-      Form1.Debug('FCalendarWidth-FHScrollPosition<ClientWidth');
-      Form1.EL.Debug('FHScrollPosition %d FTasksWidth %d ClientWidth %d - FGridVisibleRect.Right %d ClientRect.Right %d',
-                      [FHScrollPosition, FTasksWidth, ClientWidth, FGridVisibleRect.Right, ClientRect.Right]);
-      {$endif}
-    end;
+    FHScrollPosition := Max(0, FHScrollPosition - (ClientWidth - FGridVisibleRect.Width));
   //пересчитываем видимую область
   CalcScrollbarsRange;
   CalcGridVisibleRect;
 end;
 
-procedure TvpGanttTasks.VisualChange;
-begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.VisualChange');
-  {$endif}
-  UpdateSizes;
-  Invalidate;
-end;
-
 function TvpGanttTasks.GetTitleRect: TRect;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.GetTitleRect');
-  {$endif}
-  result := Rect(0, 0, ClientWidth, TvpGantt(Parent).GetTitleHeight);
+  Result := Rect(0, 0, ClientWidth, TvpGantt(Parent).GetTitleHeight);
 end;
 
 procedure TvpGanttTasks.WMSize(var Message: TLMSize);
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.WMSize');
-  {$endif}
   if not IsResizing then
     begin
       UpdateSizes;
@@ -2211,10 +2064,8 @@ procedure TvpGanttTasks.CreateParams(var Params: TCreateParams);
 const
   ClassStylesOff = CS_HREDRAW;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.CreateParams');
-  {$endif}
   inherited CreateParams(Params);
+  //добавляем к параметрам создаваемого окна только горизонтальную прокрутку
   with Params do begin
     WindowClass.Style := WindowClass.Style and DWORD(not ClassStylesOff);
     Style := Style or WS_HSCROLL or WS_CLIPCHILDREN;
@@ -2223,9 +2074,6 @@ end;
 
 procedure TvpGanttTasks.ClearCanvas;
 begin
-  {$ifdef DBGGANTTTASKS}
-   Form1.Debug('TvpGanttTasks.ClearCanvas');
-  {$endif}
   //clear canvas
   Canvas.Brush.Color := FColor;
   Canvas.FillRect(ClientRect);
@@ -2234,19 +2082,12 @@ end;
 function TvpGanttTasks.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
   MousePos: TPoint): Boolean;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.DoMouseWheel');
-  {$endif}
-  Form1.ShowParam(IntToStr(WheelDelta));
   Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
 end;
 
 function TvpGanttTasks.DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint
   ): Boolean;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.DoMouseWheelDown');
-  {$endif}
   Result:=inherited DoMouseWheelDown(Shift, MousePos);
   if not Result then
     begin
@@ -2258,9 +2099,6 @@ end;
 function TvpGanttTasks.DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint
   ): Boolean;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.DoMouseWheelUp');
-  {$endif}
   Result:=inherited DoMouseWheelUp(Shift, MousePos);
   if not Result then
     begin
@@ -2271,9 +2109,6 @@ end;
 
 procedure TvpGanttTasks.CalcGridVisibleRect;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.CalcGridVisibleRect');
-  {$endif}
   FGridVisibleRect := ClientRect;
   InflateRect(FGridVisibleRect, -1, 0);
   FGridVisibleRect.Top := FGridVisibleRect.Top + TvpGantt(Parent).GetTitleHeight;
@@ -2285,9 +2120,6 @@ var
   aStart: integer;
   tmpRect: TRect;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.CalcRowRect');
-  {$EndIf}
   Result := TRect.Create(0, 0, 0, 0);
   {DONE Рассчитать правую границу в соответствии с ClientWidth
         было FTasksWidth + aRowBorder - FHScrollPosition  стало ClientWidth}
@@ -2303,9 +2135,6 @@ procedure TvpGanttTasks.CalcTasksWidth;
 var
   i: integer;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.CalcTasksWidth');
-  {$EndIf}
   FTasksWidth := 0;
   for i:=0 to TvpGantt(Parent).IntervalCount - 1 do
     FTasksWidth := Max(FTasksWidth, Canvas.TextWidth(TvpGantt(Parent).Interval[i].FName));
@@ -2314,9 +2143,6 @@ end;
 
 procedure TvpGanttTasks.CalcTasksHeight;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.CalcTasksHeight');
-  {$EndIf}
   FTasksHeight := TvpGantt(Parent).GetTitleHeight + TvpGantt(Parent).FIntervalsHeight;
 end;
 
@@ -2325,9 +2151,6 @@ var
   HsbVisible: boolean;
   HsbRange, HsbPage, HsbPos: Integer;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.CalcScrollbarsRange');
-  {$endif}
   GetSBVisibility(HsbVisible);
   GetSBRanges(HsbVisible, HsbRange, HsbPage, HsbPos);
   UpdateHorzScrollBar(HsbVisible, HsbRange, HsbPage, HsbPos);
@@ -2337,25 +2160,19 @@ procedure TvpGanttTasks.DrawRows;
 var
   i: integer;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.DrawAllRows');
-  {$endif}
   for i:=0 to TvpGantt(Parent).IntervalCount-1 do
     DrawRow(i);
 end;
 
 procedure TvpGanttTasks.DrawEdges;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.DrawEdges');
-  {$endif}
   Canvas.Pen.Width := C_DEF_BORDER_WIDTH;
   Canvas.Pen.Style := psSolid;
   Canvas.Pen.Color := clActiveBorder;
   Canvas.MoveTo(0, TvpGantt(Parent).GetTitleHeight);
   Canvas.LineTo(0, ClientRect.Bottom - 1);
   Canvas.LineTo(ClientRect.Right - 1, ClientRect.Bottom - 1);
-  Canvas.LineTo(ClientRect.Right - 1, TvpGantt(Parent).GetTitleHeight);
+  Canvas.LineTo(ClientRect.Right - 1, TvpGantt(Parent).GetTitleHeight - 1);
 end;
 
 procedure TvpGanttTasks.DrawRow(aRow: integer);
@@ -2363,30 +2180,22 @@ var
   rowRect, cellRect: TRect;
   textPoint: TPoint;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.DrawRow');
-  {$endif}
   if not Assigned(Parent) then
     Exit;
   //область строки
   rowRect := CalcRowRect(aRow);
   cellRect := TRect.Create(0, 0, 0, 0);
-  {$ifdef DBGGANTTTASKS}
-  Form1.EL.Debug('Row rect Left %d Top %d Right %d Bottom %d',
-                  [rowRect.Left, rowRect.Top, rowRect.Right, rowRect.Bottom]);
-  Form1.EL.Debug('FVScrollPosition %d FHScrollPosition %d, ClientWidth %d, FGridVisibleRect.Height %d, FTasksWidth %d',
-                  [FvpGantt.FVScrollPosition, FHScrollPosition, ClientWidth, FGridVisibleRect.Height, FTasksWidth]);
-  {$endif}
+  //шрифт
+  Canvas.Font := Font;
   if rowRect.Height>0 then
     begin
-      {$ifdef DBGGANTTTASKS}
-      Form1.EL.Debug('Drawing row %d', [aRow]);
-      {$endif}
       //бордюр
       TvpGantt(Parent).DrawCellGrid(Canvas, rowRect);
       //цвета
-      Canvas.Font := Font;
-      Canvas.Brush.Color := FColor;
+      if TvpGantt(Parent).FIntervals[aRow].Group then
+        Canvas.Brush.Color := TvpGantt(Parent).GroupIntervalColor
+      else
+        Canvas.Brush.Color := FColor;
       //ячейка cellRect пока не рубим, будем рисовать несколько ячеек и оно нам пригодится
       CopyRect(cellRect, rowRect);
       TvpGantt(Parent).CutHBorderFromRect(cellRect);
@@ -2408,17 +2217,14 @@ var
   titRect: TRect;
   titCaption: PChar;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.DrawTitle');
-  {$endif}
   titRect := GetTitleRect;
   titCaption := PChar(TvpGantt(Parent).TaskTitleCaption);
-  if Assigned(Parent) then
+  if not TvpGantt(Parent).FTitleFontIsDefault then
     Canvas.Font.Assign(TvpGantt(Parent).TitleFont)
   else
     Canvas.Font := Font;
   TvpGantt(Parent).DrawTitleCell(Canvas, titRect);
-  TvpGantt(Parent).DrawTitleText(Canvas, titRect, titCaption, taCenter);
+  TvpGantt(Parent).DrawTitleText(Canvas, titRect, titCaption);
 end;
 
 procedure TvpGanttTasks.GetSBVisibility(out HsbVisible: boolean);
@@ -2427,9 +2233,6 @@ var
   ClientW, ClientH: Integer;
   BarH: Integer;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.GetSBVisibility');
-  {$endif}
   AutoHorz := TvpGantt(Parent).ScrollBarAutomatic(ssHorizontal);
 
   // get client bounds free of bars
@@ -2451,18 +2254,11 @@ begin
 
   if AutoHorz then
     HsbVisible := HsbVisible; // and not AutoFillColumns;
-
-  {$ifdef DBGGANTTTASKS}
-  Form1.El.Debug('Horz=%d TasksH=%d CH=%d BarH=%d', [Integer(HsbVisible), FTasksHeight, ClientHeight, BarH]);
-  {$endif}
 end;
 
 procedure TvpGanttTasks.GetSBRanges(const HsbVisible: boolean; out
   HsbRange, HsbPage, HsbPos: Integer);
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.GetSBRanges');
-  {$endif}
   //calculate only horizontal
   HsbRange := 0;
   HsbPos := 0;
@@ -2471,55 +2267,44 @@ begin
       HsbRange := FTasksWidth;
       HsbPage := ClientWidth;
     end;
-
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug(Format('HsbRange %d', [HsbRange]));
-  Form1.Debug(Format('FTasksWidth %d', [FTasksWidth]));
-  {$endif}
 end;
 
 procedure TvpGanttTasks.InvalidateRow(aRow: integer);
 var
   R: TRect;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.InvalidateRow');
-  {$endif}
   R := CalcRowRect(aRow);
   InvalidateRect(Handle, @R, true);
 end;
 
 procedure TvpGanttTasks.MouseDown(Button: TMouseButton; Shift: TShiftState; X,
   Y: Integer);
+var
+  curPoint: TPoint;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.MouseDown');
-  {$endif}
-  TvpGantt(Parent).MouseDown(Button, Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseDown(Button, Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttTasks.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  curPoint: TPoint;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.MouseMove');
-  {$endif}
-  TvpGantt(Parent).MouseMove(Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseMove(Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttTasks.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
   Y: Integer);
+var
+  curPoint: TPoint;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.MouseUp');
-  {$endif}
-  TvpGantt(Parent).MouseUp(Button, Shift, X, Y);
+  curPoint := ClientToParent(Point(X, Y), Parent);
+  TvpGantt(Parent).MouseUp(Button, Shift, curPoint.X, curPoint.Y);
 end;
 
 procedure TvpGanttTasks.Paint;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.Paint');
-  {$endif}
   ClearCanvas;
   DrawRows;
   DrawTitle;
@@ -2528,9 +2313,6 @@ end;
 
 function TvpGanttTasks.ScrollBarIsVisible(Which: Integer): Boolean;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.ScrollBarIsVisible');
-  {$endif}
   Result:=false;
   if HandleAllocated then begin
     {$IFNDEF MSWINDOWS}
@@ -2551,12 +2333,11 @@ var
   ScrollInfo: TScrollInfo;
   aVisible: Boolean;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.ScrollBarPosition');
-  {$endif}
   if HandleAllocated then begin
-    if Which = SB_HORZ then aVisible := FHSbVisible
-    else aVisible := false;
+    if Which = SB_HORZ then
+      aVisible := FHSbVisible
+    else
+      aVisible := false;
     FillChar(ScrollInfo, SizeOf(ScrollInfo), 0);
     ScrollInfo.cbSize := SizeOf(ScrollInfo);
     ScrollInfo.fMask := SIF_POS;
@@ -2570,9 +2351,6 @@ procedure TvpGanttTasks.ScrollBarRange(Which: Integer; aRange, aPage,
 var
   ScrollInfo: TScrollInfo;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.ScrollBarRange');
-  {$endif}
   if HandleAllocated then begin
     FillChar(ScrollInfo, SizeOf(ScrollInfo), 0);
     ScrollInfo.cbSize := SizeOf(ScrollInfo);
@@ -2589,9 +2367,6 @@ end;
 
 procedure TvpGanttTasks.ScrollBarShow(Which: Integer; aValue: boolean);
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.ScrollBarShow');
-  {$endif}
   if HandleAllocated then begin
     ShowScrollBar(Handle,Which,aValue);
     if Which in [SB_BOTH, SB_HORZ] then FHSbVisible := AValue;
@@ -2601,9 +2376,6 @@ end;
 procedure TvpGanttTasks.UpdateHorzScrollBar(const aVisible: boolean;
   const aRange, aPage, aPos: Integer);
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.UpdateHorzScrollBar');
-  {$endif}
   ScrollBarShow(SB_HORZ, aVisible);
   if aVisible then
     ScrollBarRange(SB_HORZ, aRange, aPage, aPos);
@@ -2615,9 +2387,6 @@ var
   ScrollInfo: TScrollInfo;
   aCode: Smallint;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.WMHScroll');
-  {$endif}
   if not HandleAllocated then
     exit;
 
@@ -2632,10 +2401,7 @@ begin
   aCode := message.ScrollCode;
   aPos := ScrollInfo.nPos;
 
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug(Format('maxPos %d', [maxPos]));
-  Form1.Debug(Format('aPos %d', [aPos]));
-  {$endif}
+  //сдвигаем в соответсвии с получсенным кодом
   case aCode of
     SB_LEFT:
       aPos := ScrollInfo.nMin;
@@ -2673,28 +2439,16 @@ begin
       Exit;
   end;
 
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug(Format('aPos %d', [aPos]));
-  Form1.Debug(Format('FHScrollPosition %d', [FHScrollPosition]));
-  {$endif}
-
+  //устанавливаем ползунок в нужную позицию и запоминаем сдвиг компонента
   ScrollBarPosition(SB_HORZ, aPos);
   FHScrollPosition := aPos;
-
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug(Format('FHScrollPosition %d', [FHScrollPosition]));
-  Form1.Debug(Format('FHScrollPosition %d', [FHScrollPosition]));
-  {$endif}
-
+  //перерисовываем
   Invalidate;
 end;
 
 constructor TvpGanttTasks.Create(AOwner: TvpGantt);
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.Create');
-  {$endif}
-  inherited create(AOwner);
+  inherited Create(AOwner);
   Parent := AOwner;
   //default value
   FHScrollPosition := 0;
@@ -2702,9 +2456,6 @@ end;
 
 destructor TvpGanttTasks.Destroy;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.Destroy');
-  {$endif}
   inherited Destroy;
 end;
 
@@ -2712,9 +2463,6 @@ procedure TvpGanttTasks.InvalidateTitle;
 var
   R: TRect;
 begin
-  {$ifdef DBGGANTTTASKS}
-  Form1.Debug('TvpGanttTasks.InvalidateTitle');
-  {$endif}
   if not HandleAllocated then
     exit;
   R := GetTitleRect;
@@ -2723,13 +2471,10 @@ end;
 
 { TvpGantt }
 
-procedure TvpGantt.ClearDates;
+procedure TvpGantt.ClearBoundDates;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.ClearDates');
-  {$EndIf}
-  FStartDate := 0;
-  FEndDate := 0;
+  FStartDateOfBound := 0;
+  FEndDateOfBound := 0;
 end;
 
 function TvpGantt.GetCalendarColor: TColor;
@@ -2739,70 +2484,55 @@ end;
 
 procedure TvpGantt.CalcIntervalsHeight;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.CalcIntervalsHeight');
-  {$EndIf}
   FIntervalsHeight := IntervalCount * RowHeight;
 end;
 
 procedure TvpGantt.CalcFocusRect;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.CalcFocusRect');
-  {$endif}
-  {$ifdef DBGGANTTTASKS}
-  Form1.EL.Debug('FFocusRow %d RowHeight %d FGanttBorderWidth %d GetTitleHeight %d FVScrollPosition %d',
-                  [FFocusRow, RowHeight, FGanttBorderWidth, GetTitleHeight, FVScrollPosition]);
-  {$EndIf}
   FFocusRect := ClientRect;
   FFocusRect.Top := FFocusRow * RowHeight + GetTitleHeight - FVScrollPosition;
   if vpgHorzLine in Options then
     FFocusRect.Height := RowHeight - GetBorderWidth;
   if vpgVertLine in Options then
     FFocusRect.Right := FFocusRect.Right - GetBorderWidth;
-  {$ifdef DBGGANTTTASKS}
-  Form1.EL.Debug('FFocusRect LTRB %d %d %d %d', [FFocusRect.Left, FFocusRect.Top, FFocusRect.Right, FFocusRect.Bottom]);
-  {$EndIf}
 end;
 
 procedure TvpGantt.CutBorderFromRect(var aRect: TRect);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.CalcCellRectWoBorder');
-  {$EndIf}
   CutHBorderFromRect(aRect);
   CutVBorderFromRect(aRect);
 end;
 
 procedure TvpGantt.CutHBorderFromRect(var aRect: TRect);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.CutHBorderFromRect');
-  {$EndIf}
   aRect.Bottom := aRect.Bottom - GetHorzBorderWidth;
 end;
 
 procedure TvpGantt.CutVBorderFromRect(var aRect: TRect);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.CutVBorderFromRect');
-  {$EndIf}
   aRect.Right := aRect.Right - GetVertBorderWidth;
 end;
 
+procedure TvpGantt.DoClick(Sender: TObject);
+begin
+  if Assigned(OnClick) then
+    OnClick(Self);
+end;
+
+procedure TvpGantt.DoDblClick(Sender: TObject);
+begin
+  if Assigned(OnDblClick) then
+    OnDblClick(Self);
+end;
+
+
 function TvpGantt.GetIntervalsHeight: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetIntervalsHeight');
-  {$EndIf}
   Result := FIntervalsHeight;
 end;
 
 function TvpGantt.GetIntervalCount: Integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetIntervalCount');
-  {$endif}
   Result := 0;
   if Assigned(FIntervals) then
     Result := FIntervals.Count;
@@ -2810,34 +2540,22 @@ end;
 
 function TvpGantt.GetInterval(AnIndex: Integer): TvpInterval;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetInterval');
-  {$endif}
-  Result := TvpInterval(FIntervals[AnIndex]);
+  Result := FIntervals[AnIndex];
 end;
 
 procedure TvpGantt.OnTitleFontChanged(Sender: TObject);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.OnTitleFontChanged');
-  {$endif}
   FTitleFontIsDefault := False;
   VisualChange;
 end;
 
 function TvpGantt.OptionsIsStored: Boolean;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.OptionsIsStored');
-  {$endif}
   Result := FvpGanttOptions <> DefaultGanttOptions;
 end;
 
 procedure TvpGantt.SetDateFormat(AValue: String);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetDateFormat');
-  {$endif}
   if Trim(AValue) = '' then
     AValue := DefaultFormatSettings.ShortDateFormat + ' ' +
               DefaultFormatSettings.ShortTimeFormat;
@@ -2851,9 +2569,6 @@ var
   aDT: TDateTime;
   aYear, aMonth, ADay: word;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetEndDate');
-  {$endif}
   //декодируем в числа и получаем конец дня
   DecodeDate(AValue, aYear, aMonth, ADay);
   aDT := EndOfADay(aYear, aMonth, ADay);
@@ -2867,6 +2582,8 @@ begin
       FEndDate := aDT;
       if FEndDate<FStartDate then
         FStartDate := StartOfTheDay(aDT);
+      //обнуляем текущий диапазон, мы его пересчитаем
+      FEndDateOfBound := 0;
       UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
@@ -2874,9 +2591,6 @@ end;
 
 procedure TvpGantt.SetExpiredIntervalColor(AValue: TColor);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetExpiredIntervalColor');
-  {$endif}
   if FExpiredIntervalColor = AValue then
     Exit;
   FExpiredIntervalColor := AValue;
@@ -2885,9 +2599,6 @@ end;
 
 procedure TvpGantt.SetFactIntervalColor(AValue: TColor);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetFactIntervalColor');
-  {$endif}
   if FFactIntervalColor = AValue then
     Exit;
   FFactIntervalColor := AValue;
@@ -2896,9 +2607,6 @@ end;
 
 procedure TvpGantt.SetFocusColor(AValue: TColor);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetFocusColor');
-  {$endif}
   if FFocusColor = AValue then
     Exit;
   FFocusColor := AValue;
@@ -2908,20 +2616,22 @@ end;
 
 procedure TvpGantt.SetFreeIntervalColor(AValue: TColor);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetFreeIntervalColor');
-  {$endif}
   if FFreeIntervalColor = AValue then
     Exit;
   FFreeIntervalColor := AValue;
   VisualChange;
 end;
 
+procedure TvpGantt.SetGroupIntervalColor(AValue: TColor);
+begin
+  if FGroupIntervalColor = AValue then
+    Exit;
+  FGroupIntervalColor := AValue;
+  VisualChange;
+end;
+
 procedure TvpGantt.SetMajorScale(AValue: TvpTimeScale);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetMajorScale');
-  {$endif}
   if not FvpGanttCalendar.HandleAllocated then
     Exit;
   if csReading in ComponentState then
@@ -2933,6 +2643,8 @@ begin
   else
     begin
       FvpGanttCalendar.FMajorScale := AValue;
+      //обнуляем шкалу для правильного пересчета
+      ClearBoundDates;
       UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
@@ -2940,9 +2652,6 @@ end;
 
 procedure TvpGantt.SetMinorScale(AValue: TvpTimeScale);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetMinorScale');
-  {$endif}
   if not FvpGanttCalendar.HandleAllocated then
     Exit;
   if csReading in ComponentState then
@@ -2954,6 +2663,8 @@ begin
   else
     begin
       FvpGanttCalendar.FMinorScale := AValue;
+      //обнуляем шкалу для правильного пересчета
+      ClearBoundDates;
       UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
@@ -2961,9 +2672,6 @@ end;
 
 procedure TvpGantt.SetMajorScaleHeight(AValue: integer);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetMajorScaleHeight');
-  {$endif}
   if FMajorScaleHeight = AValue then
     Exit;
   FMajorScaleHeight := AValue;
@@ -2972,9 +2680,6 @@ end;
 
 procedure TvpGantt.SetMinorScaleHeight(AValue: integer);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetMinorScaleHeight');
-  {$endif}
   if FMinorScaleHeight = AValue then
     Exit;
   FMinorScaleHeight := AValue;
@@ -2983,9 +2688,6 @@ end;
 
 procedure TvpGantt.SetOptions(AValue: TvpGanttOptions);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetOptions');
-  {$endif}
   if FvpGanttOptions = AValue then Exit;
   FvpGanttOptions := AValue;
   VisualChange;
@@ -3001,9 +2703,6 @@ end;
 
 procedure TvpGantt.SetPlanIntervalColor(AValue: TColor);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetPlanIntervalColor');
-  {$endif}
   if FPlanIntervalColor = AValue then
     Exit;
   FPlanIntervalColor := AValue;
@@ -3012,9 +2711,6 @@ end;
 
 procedure TvpGantt.SetRowHeight(AValue: integer);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetRowHeight');
-  {$endif}
   if FRowHeight = AValue then Exit;
   FRowHeight := AValue;
   VisualChange;
@@ -3022,9 +2718,6 @@ end;
 
 procedure TvpGantt.SetGridBorderWidth(AValue: integer);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetBorderWidth');
-  {$endif}
   if FGridBorderWidth = AValue then
     Exit;
   FGridBorderWidth := AValue;
@@ -3033,9 +2726,6 @@ end;
 
 procedure TvpGantt.SetBorderColor(AValue: TColor);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetBorderColor');
-  {$endif}
   if FBorderColor = AValue then
     Exit;
   FBorderColor := AValue;
@@ -3047,9 +2737,6 @@ var
   aDT: TDateTime;
   aYear, aMonth, ADay: word;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetStartDate');
-  {$endif}
   //декодируем в числа и получаем начало дня
   DecodeDate(AValue, aYear, aMonth, ADay);
   aDT := StartOfADay(aYear, aMonth, ADay);
@@ -3063,6 +2750,8 @@ begin
       FStartDate := aDT;
       if FStartDate>FEndDate then
         FEndDate := EndOfTheDay(aDT);
+      //обнуляем текущий диапазон, мы его пересчитаем
+      FStartDateOfBound := 0;
       UpdateBoundDates(FStartDate, FEndDate);
       VisualChange;
     end;
@@ -3070,9 +2759,6 @@ end;
 
 procedure TvpGantt.SetTaskColor(AValue: TColor);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetTaskColor');
-  {$endif}
   if FvpGanttTasks.FColor=AValue then
     Exit;
   FvpGanttTasks.FColor := AValue;
@@ -3082,9 +2768,6 @@ end;
 
 procedure TvpGantt.SetCalendarColor(AValue: TColor);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetCalendarColor');
-  {$endif}
   if FvpGanttCalendar.FColor=AValue then
     Exit;
   FvpGanttCalendar.FColor := AValue;
@@ -3094,9 +2777,6 @@ end;
 
 procedure TvpGantt.SetScrollBars(const AValue: TScrollStyle);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetScrollBars');
-  {$endif}
   if FScrollBars=AValue then
     Exit;
   FScrollBars := AValue;
@@ -3105,20 +2785,14 @@ end;
 
 procedure TvpGantt.SetTaskTitleCaption(AValue: TCaption);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetTaskTitleCaption');
-  {$endif}
   if FTaskTitleCaption=AValue then Exit;
   FTaskTitleCaption := AValue;
   if FvpGanttTasks.HandleAllocated then
-    FvpGanttTasks.VisualChange;
+    FvpGanttTasks.Repaint;
 end;
 
 procedure TvpGantt.SetTitleColor(AValue: TColor);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetTitleColor');
-  {$endif}
   if FTitleColor = AValue then Exit;
   FTitleColor := AValue;
   VisualChange;
@@ -3126,18 +2800,12 @@ end;
 
 procedure TvpGantt.SetTitleFont(const AValue: TFont);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetTitleFont');
-  {$endif}
   FTitleFont.Assign(AValue);
   VisualChange;
 end;
 
 procedure TvpGantt.SetTitleStyle(const AValue: TTitleStyle);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetTitleStyle');
-  {$endif}
   if FTitleStyle=AValue then exit;
   FTitleStyle:=AValue;
   Invalidate;
@@ -3145,37 +2813,21 @@ end;
 
 procedure TvpGantt.SetFocus;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetFocus');
-  {$endif}
   if not Focused and not(csNoFocus in ControlStyle) then
     begin
       inherited;
       InvalidateFocused;
     end;
-  //else
-  //  begin
-  //    {$ifDef DBGGANTTCALENDAR}
-  //    DebugLnExit('TvpGanttCalendar.MouseDown EXIT: Focus not allowed');
-  //    {$Endif}
-  //    Exit;
-  //  end;
 end;
 
 procedure TvpGantt.InvalidateFocused;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.InvalidateFocused');
-  {$endif}
   if FUpdateCount=0 then
     InvalidateRow(FFocusRow);
 end;
 
 procedure TvpGantt.InvalidateRow(aRow: integer);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.InvalidateRow');
-  {$endif}
   if FvpGanttTasks.HandleAllocated then
     FvpGanttTasks.InvalidateRow(aRow);
   if FvpGanttCalendar.HandleAllocated then
@@ -3184,15 +2836,12 @@ end;
 
 procedure TvpGantt.KeyDown(var Key: Word; Shift: TShiftState);
 var
-  Sh: Boolean;
+  //Sh: Boolean;
   DeltaRow: Integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.KeyDown INIT');
-  {$endif}
   inherited KeyDown(Key, Shift);
 
-  Sh := (ssShift in Shift);
+  //Sh := (ssShift in Shift);
 
   case Key of
     //VK_TAB:
@@ -3245,7 +2894,6 @@ begin
         //кол-во видимых строк
         DeltaRow := Trunc((ClientRect.Height - GetTitleHeight - FScrollBarHeight) / RowHeight);
         SelectNextRow(-DeltaRow);
-        {TODO -oVas: неправильно работает прокрутка постраничная}
       end;
     VK_NEXT:
       begin
@@ -3265,6 +2913,7 @@ begin
     //VK_X:
     //  if not FEditorKey and (Shift = [ssShift]) then
     //    doCutToClipboard;
+    {TODO -o Vas -u vpGannt: Сделать обработку удаления}
     //VK_DELETE:
     //  if not FEditorKey and EditingAllowed(FCol)
     //  and (Editor is TCustomEdit) and not (csDesigning in ComponentState)
@@ -3276,9 +2925,6 @@ begin
     //    Key := 0;
     //  end;
   end;
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.KeyDown END');
-  {$endif}
 end;
 
 procedure TvpGantt.KeyUp(var Key: Word; Shift: TShiftState);
@@ -3297,10 +2943,6 @@ var
   aRow: integer;
 begin
   inherited MouseDown(Button, Shift, X, Y);
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.MouseDown');
-  Form1.EL.Debug('x %d y %d',[X, Y]);
-  {$endif}
   aRow := GetRowPosY(Y);
   if aRow>-1 then
     SetFocusRow(aRow);
@@ -3311,10 +2953,6 @@ procedure TvpGantt.MouseMove(Shift: TShiftState; X, Y: Integer);
 var
   aRow: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.MouseMove');
-  Form1.EL.Debug('x %d y %d',[X, Y]);
-  {$endif}
   inherited MouseMove(Shift, X, Y);
 
   if csDesigning in ComponentState then
@@ -3335,18 +2973,11 @@ end;
 procedure TvpGantt.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
   Y: Integer);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.MouseUp');
-  Form1.EL.Debug('x %d y %d',[X, Y]);
-  {$endif}
   inherited MouseUp(Button, Shift, X, Y);
 end;
 
 function TvpGantt.ScrollBarAutomatic(Which: TScrollStyle): boolean;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.ScrollBarAutomatic');
-  {$endif}
   Result := false;
   if (Which=ssVertical) OR (Which=ssHorizontal) then
     begin
@@ -3360,27 +2991,18 @@ end;
 
 procedure TvpGantt.VisualChange;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.VisualChange INIT');
-  {$endif}
   UpdateSizes;
   if (FUpdateCount=0) AND HandleAllocated then
     begin
-      {$ifdef DBGGANTT}
-      Form1.Debug('TvpGantt.VisualChange WORK');
-      {$endif}
       if FvpGanttTasks.HandleAllocated then
-        FvpGanttTasks.VisualChange;
+        FvpGanttTasks.Repaint;
       if FvpGanttCalendar.HandleAllocated then
-        FvpGanttCalendar.VisualChange;
+        FvpGanttCalendar.Repaint;
     end;
 end;
 
 procedure TvpGantt.CMMouseEnter(var Message: TLMessage);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.CMMouseEnter');
-  {$endif}
   inherited;
   FSavedHint := Hint;
 end;
@@ -3392,71 +3014,54 @@ begin
 end;
 
 procedure TvpGantt.UpdateSizes;
-var
-  heightWithHScrollBar, visHeight: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.UpdateSizes');
-  {$endif}
   CalcIntervalsHeight;
-  //считаем сдвиг по вертикали
-  if FvpGanttTasks.HandleAllocated AND FvpGanttCalendar.HandleAllocated then
-    begin
-      visHeight := FIntervalsHeight + GetTitleHeight - FVScrollPosition;
-      if (FvpGanttTasks.FHSbVisible) OR (FvpGanttCalendar.FHSbVisible) then
-        heightWithHScrollBar := ClientHeight - FScrollBarHeight
-      else
-        heightWithHScrollBar := ClientHeight;
-      if (visHeight<heightWithHScrollBar) then
-        begin
-          FVScrollPosition := FVScrollPosition - (heightWithHScrollBar - visHeight);
-          FVScrollPosition := max(0, FVScrollPosition);
-          SendMessage(FvpGanttCalendar.Handle, LM_VSCROLL, MakeWParam(SB_THUMBPOSITION, FVScrollPosition),0);
-        end;
-    end;
+  if FvpGanttTasks.HandleAllocated then
+    FvpGanttTasks.UpdateSizes;
+  if FvpGanttCalendar.HandleAllocated then
+    FvpGanttCalendar.UpdateSizes;
 end;
 
 procedure TvpGantt.WMSize(var message: TLMSize);
+var
+  heightWithHScrollBar, visHeight: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.WMSize');
-  {$endif}
   if not IsResizing then
     begin
       UpdateSizes;
+      //считаем сдвиг по вертикали
+      if FvpGanttTasks.HandleAllocated AND FvpGanttCalendar.HandleAllocated then
+        begin
+          visHeight := FIntervalsHeight + GetTitleHeight - FVScrollPosition;
+          if (FvpGanttTasks.FHSbVisible) OR (FvpGanttCalendar.FHSbVisible) then
+            heightWithHScrollBar := ClientHeight - FScrollBarHeight
+          else
+            heightWithHScrollBar := ClientHeight;
+          if (visHeight<heightWithHScrollBar) then
+            begin
+              FVScrollPosition := FVScrollPosition - (heightWithHScrollBar - visHeight);
+              FVScrollPosition := max(0, FVScrollPosition);
+              SendMessage(FvpGanttCalendar.Handle, LM_VSCROLL, MakeWParam(SB_THUMBPOSITION, FVScrollPosition),0);
+            end;
+        end;
       inherited;
     end;
 end;
 
 procedure TvpGantt.WMKillFocus(var message: TLMKillFocus);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.WMKillFocus');
-  {$endif}
+  inherited WMKillFocus(Message);
   InvalidateFocused;
 end;
 
 procedure TvpGantt.WMSetFocus(var message: TLMSetFocus);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.WMSetFocus');
-  {$endif}
-  {$ifdef DBGFOCUS}
-  Form1.Debug('*** gantt.WMSetFocus, FocusedWnd=' + dbgs(Message.FocusedWnd) + ' [' + dbgs(pointer(Message.FocusedWnd))+'] ');
-  if Message.FocusedWnd=Self.Handle then
-    Form1.EL.Debug('Same Grid!')
-  else
-    Form1.EL.Debug('ExternalWindow');
-  {$endif}
   inherited WMSetFocus(Message);
   InvalidateFocused;
 end;
 
 function TvpGantt.GetBorderWidth: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetBorderWidth');
-  {$endif}
   if FGridBorderWidth > 0 then
     Result := FGridBorderWidth
   else
@@ -3465,9 +3070,6 @@ end;
 
 function TvpGantt.GetHorzBorderWidth: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetHorzBorderWidth');
-  {$endif}
   if vpgHorzLine in Options then
     Result := GetBorderWidth
   else
@@ -3476,28 +3078,19 @@ end;
 
 function TvpGantt.GetVertBorderWidth: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetVertBorderWidth');
-  {$endif}
   if vpgVertLine in Options then
     Result := GetBorderWidth
   else
     Result := 0;
 end;
 
-function TvpGantt.GetIntervalIndex: integer;
+function TvpGantt.GetSelectedIndex: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetIntervalIndex');
-  {$endif}
   Result := FFocusRow;
 end;
 
 function TvpGantt.GetMajorScale: TvpTimeScale;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetMajorScale');
-  {$endif}
   if not FvpGanttCalendar.HandleAllocated then
     Result := vptsDay
   else
@@ -3506,17 +3099,11 @@ end;
 
 function TvpGantt.GetMajorScaleHeight: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetMajorScaleHeight');
-  {$endif}
   Result := FMajorScaleHeight;
 end;
 
 function TvpGantt.GetMinorScale: TvpTimeScale;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetMinorScale');
-  {$endif}
   if not FvpGanttCalendar.HandleAllocated then
     Result := vptsHour
   else
@@ -3525,9 +3112,6 @@ end;
 
 function TvpGantt.GetPixelPerMinorScale: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetPixelPerMinorScale');
-  {$endif}
   if FvpGanttCalendar.HandleAllocated then
     Result := FvpGanttCalendar.FPixelePerMinorScale
   else
@@ -3541,17 +3125,11 @@ end;
 
 function TvpGantt.GetStartDateOfBound: TDateTime;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetStartIntervalDate');
-  {$endif}
   Result := FStartDateOfBound;
 end;
 
 function TvpGantt.GetEndDateOfBound: TDateTime;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetEndIntervalDate');
-  {$endif}
   Result := FEndDateOfBound;
 end;
 
@@ -3561,9 +3139,6 @@ procedure TvpGantt.UpdateDates;
 var
   i: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetMajorScale');
-  {$endif}
   //обнуляем время
   FStartDateOfBound := 0;
   FEndDateOfBound := 0;
@@ -3575,60 +3150,45 @@ end;
 
 function TvpGantt.Focused: boolean;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.Focused');
-  {$endif}
   Result := inherited Focused;
-  {$ifdef DBGFOCUS}
-  Form1.EL.Debug('Result inherited %d', [Integer(Result)]);
-  {$endif}
   Result := Result AND CanTab;
-  {$ifdef DBGFOCUS}
-  Form1.EL.Debug('Result FindOwnerControl %d', [Integer(Result)]);
-  {$endif}
   //если задачник в фокусе
   if FvpGanttTasks.HandleAllocated then
     Result := Result OR FvpGanttTasks.Focused;
-  {$ifdef DBGFOCUS}
-  Form1.EL.Debug('Result FvpGanttTasks %d', [Integer(Result)]);
-  {$endif}
   //или календарь
   if FvpGanttCalendar.HandleAllocated then
     Result := Result OR FvpGanttCalendar.Focused;
-  {$ifdef DBGFOCUS}
-  Form1.EL.Debug('Result FvpGanttCalendar %d', [Integer(Result)]);
-  {$endif}
+end;
+
+procedure TvpGantt.Repaint;
+begin
+  UpdateSizes;
+  inherited Repaint;
+end;
+
+procedure TvpGantt.ScrollToCurTime;
+begin
+  if (FUpdateCount=0) AND (FvpGanttCalendar.HandleAllocated) then
+    FvpGanttCalendar.ScrollToCurTime;
 end;
 
 function TvpGantt.GetMinorScaleHeight: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetMajorScale');
-  {$endif}
   Result := FMinorScaleHeight;
 end;
 
 function TvpGantt.GetTaskTitleCaption: TCaption;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetTaskTitleCaption');
-  {$endif}
   Result := FTaskTitleCaption;
 end;
 
 procedure TvpGantt.Paint;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.Paint');
-  {$endif}
   //отрисовка :)
 end;
 
 procedure TvpGantt.FontChanged(Sender: TObject);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.FontChanged');
-  {$endif}
   if csCustomPaint in ControlState then
     Canvas.Font := Font
   else
@@ -3643,17 +3203,11 @@ end;
 
 function TvpGantt.GetFocusRow: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetFocusRow');
-  {$endif}
   Result := FFocusRow;
 end;
 
 procedure TvpGantt.SetFocusRow(AValue: integer);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SetFocusRow');
-  {$endif}
   if (FFocusRow=AValue) then
     Exit;
   //если список пустой  или AValue <0
@@ -3665,20 +3219,20 @@ begin
   if AValue>IntervalCount-1 then
     raise Exception.Create(RS_E_LIST_INDEX_OUT_OF_BOUNDS)
   else
-    FFocusRow := AValue;
-  //рассчитали новую область фокуса
-  CalcFocusRect;
-  if (FUpdateCount=0) AND (FvpGanttCalendar.HandleAllocated) then
-    FvpGanttCalendar.ScrollToFocus;
+    begin
+      //стираем текущий фокус
+      InvalidateFocused;
+      FFocusRow := AValue;
+      CalcFocusRect;
+      if (FUpdateCount=0) AND (FvpGanttCalendar.HandleAllocated) then
+        FvpGanttCalendar.ScrollToFocus;
+    end;
 end;
 
 procedure TvpGantt.SelectNextRow(const ADelta: integer);
 var
   aRow: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.SelectNextRow');
-  {$endif}
   //если стоим на первой строкt или -1 и прокрутка вверх, то ничего не делаем
   if (FFocusRow<=0) AND (ADelta<0) then
     Exit;
@@ -3696,28 +3250,25 @@ var
   txt, AppHint: string;
   duration, complete: Double;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.ShowRowHintWindow');
-  {$endif}
   //если не показывать хинт для строк или строки отсутсвубт под курсором мыши
   if not (vpgRowHint in Options) OR (FMouseInterval<0) then
     Exit;
   //строим подсказку
-  txt := TvpInterval(FIntervals[FMouseInterval]).Name;
-  txt := txt + LineEnding + RS_HINT_STARTDATE + FormatDateTime(DateFormat, TvpInterval(FIntervals[FMouseInterval]).StartDate);
+  txt := FIntervals[FMouseInterval].Name;
+  txt := txt + LineEnding + RS_HINT_STARTDATE + FormatDateTime(DateFormat, FIntervals[FMouseInterval].StartDate);
   //продолжительность в часах
-  duration := RoundTo(TvpInterval(FIntervals[FMouseInterval]).Duration * 24, -2);
+  duration := RoundTo(FIntervals[FMouseInterval].Duration * 24, -2);
   txt := txt + LineEnding + RS_HINT_DURATION + FloatToStr(duration) + ' ' + RS_HOUR;
-  if TvpInterval(FIntervals[FMouseInterval]).FFinishDate>0 then
+  if FIntervals[FMouseInterval].FFinishDate>0 then
     begin
-      txt := txt + LineEnding + RS_HINT_FINISHDATE + FormatDateTime(DateFormat, TvpInterval(FIntervals[FMouseInterval]).FinishDate);
-      complete := RoundTo(TvpInterval(FIntervals[FMouseInterval]).Complete * 24, -2);
+      txt := txt + LineEnding + RS_HINT_FINISHDATE + FormatDateTime(DateFormat, FIntervals[FMouseInterval].FinishDate);
+      complete := RoundTo(FIntervals[FMouseInterval].Complete * 24, -2);
       txt := txt + LineEnding + RS_HINT_COMPLETE + FloatToStr(complete) + ' ' + RS_HOUR;
     end;
   if (txt = '') and (FSavedHint <> '') then
     txt := FSavedHint;
-  if (AppHint = '') then
-    AppHint := FSavedHint;
+//  if (AppHint = '') then
+  AppHint := FSavedHint;
   if (txt <> '') and not (csDesigning in ComponentState) then
     begin
       Hint := txt;
@@ -3741,13 +3292,7 @@ procedure TvpGantt.UpdateBoundDates(AStartDate, AEndDate: TDate);
 var
   aSYear, aSMonth, aSDay: word;
   aEYear, aEMonth, aEDay: word;
-  oldStartBound, oldEndBound: TDateTime;
 begin
-  {$ifdef DBGGANTT}
-  Form1.EL.Debug('TvpGantt.UpdateIntervalDates %s %s', [DateToStr(AStartDate), DateToStr(AEndDate)]);
-  {$endif}
-  oldStartBound := FStartDateOfBound;
-  oldEndBound := FEndDateOfBound;
   //выбираем меньшую дату между занятой и устанавливаемой
   AStartDate := Min(AStartDate, StartDate);
   //если уже период считали, то проверяем не получили ли мы диапазон уже, чем в прошлый раз
@@ -3819,20 +3364,13 @@ begin
         FEndDateOfBound := EndOfAYear(aEYear);
       end;
   end;
-  //пересчитываем значения календаря, только если даты изменились
-  if (oldStartBound<>FStartDateOfBound) OR (oldEndBound<>FEndDateOfBound) then
-    begin
-      if FvpGanttCalendar.HandleAllocated then
-        FvpGanttCalendar.CalcScaleCount;
-      //и нужно пересчитатть по
-      RecalcIntervals;
-    end;
-  {$ifdef DBGGANTT}
-  Form1.Debug('Start date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', StartDate));
-  Form1.Debug('End date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', EndDate));
-  Form1.Debug('Start interval date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FStartIntervalDate));
-  Form1.Debug('End interval date time ' + FormatDateTime('dd.mm.yyyy hh:nn:ss', FEndIntervalDate));
-  {$endif}
+  //пересчитываем значения календаря
+  //хорошо было бы пересчитывать только если даты изменились, но при смене типа шкал тоже пересчитать надо,
+  //а даты при этом не меняются :(
+  if FvpGanttCalendar.HandleAllocated then
+    FvpGanttCalendar.CalcScaleCount;
+  //и нужно пересчитать интервалы
+  RecalcIntervals;
 end;
 
 { Функция вычисления номера строки под курсором мыши
@@ -3843,9 +3381,6 @@ function TvpGantt.GetRowPosY(const YPos: integer): integer;
 var
   aTH: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetRowPosXY');
-  {$endif}
   {DONE Отработать правильное нажатие на титле, иначе ниже середины получаем 0 строку и соответственно
         переход на первую строку}
   aTH := GetTitleHeight;
@@ -3860,21 +3395,17 @@ end;
 
 constructor TvpGantt.Create(AOwner: TComponent);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.Create');
-  {$endif}
   inherited Create(AOwner);
   TabStop := true;
-  {$ifdef DBGGANTT}
-  Form1.EL.Debug('TabStop %d', [Integer(TabStop)]);
-  {$endif}
 
-  FIntervals := TList.Create;
+  FIntervals := TvpIntervalList.Create;
 
   //create vpGanttTasks
   FvpGanttTasks := TvpGanttTasks.Create(Self);
   FvpGanttTasks.Width := C_DEF_TASKS_WIDTH;
   FvpGanttTasks.Align := alLeft;
+  FvpGanttTasks.OnClick := @DoClick;
+  FvpGanttTasks.OnDblClick := @DoDblClick;
 
   //create splitter
   FSplitter := TSplitter.Create(Self);
@@ -3887,6 +3418,8 @@ begin
   //create vpGanttTasks
   FvpGanttCalendar := TvpGanttCalendar.Create(Self);
   FvpGanttCalendar.Align := alClient;
+  FvpGanttCalendar.OnClick := @DoClick;
+  FvpGanttCalendar.OnDblClick := @DoDblClick;
 
   BeginUpdate;
 
@@ -3901,10 +3434,11 @@ begin
   CalendarColor := clWindow;
   BorderColor := clActiveBorder;
   ScrollBars := ssAutoBoth;
-  FRowHighlightColor :=  GetHighLightColor(clHighlight, C_ROW_HIGHLITE_VALUE);
+  FRowHighlightColor :=  GetHighLightColor(clHighlight, C_ROW_HIGHLIGHT_VALUE);
 
-  FPlanIntervalColor := clSkyBlue;
-  FFactIntervalColor := clBlue;
+  FGroupIntervalColor := cl3DLight;
+  FPlanIntervalColor := clAqua;
+  FFactIntervalColor := GetShadowColor(clHighlight, C_FACT_SHADOW_VALUE);
   FFreeIntervalColor := clLime;
   FExpiredIntervalColor := clRed;
 
@@ -3914,7 +3448,6 @@ begin
 
   FTitleFont := TFont.Create;
   FTitleFont.OnChange := @OnTitleFontChanged;
-  FTitleFont.Style := [fsBold];
   FTitleFontIsDefault := True;
   with FTitleTextStyle do
     begin
@@ -3949,23 +3482,18 @@ begin
 end;
 
 destructor TvpGantt.Destroy;
-var
-  i: Integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.Destroy');
-  {$endif}
   try
     try
-      for i := 0 to FIntervals.Count-1 do
-        TvpInterval(FIntervals.Items[i]).Free;
+      //for i := 0 to FIntervals.Count-1 do
+      //  FIntervals.Items[i].Free;
     except
     end;
   finally
     FvpGanttCalendar.Free;
     FSplitter.Free;
     FvpGanttTasks.Free;
-    FreeAndNil(FIntervals);
+    FIntervals.Free;
     FreeThenNil(FTitleFont);
   end;
   inherited Destroy;
@@ -3974,9 +3502,6 @@ end;
 
 procedure TvpGantt.AddInterval(AnInterval: TvpInterval);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.AddInterval');
-  {$endif}
   FIntervals.Add(AnInterval);
   if vpgMoveFocusToNewInterval in Options then
     SetFocusRow(FIntervals.Count-1);
@@ -3985,9 +3510,6 @@ end;
 
 procedure TvpGantt.InsertInterval(AnIndex: Integer; AnInterval: TvpInterval);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.InsertInterval');
-  {$endif}
   FIntervals.Insert(AnIndex, AnInterval);
   if vpgMoveFocusToNewInterval in Options then
     SetFocusRow(AnIndex);
@@ -3996,9 +3518,6 @@ end;
 
 procedure TvpGantt.DeleteInterval(AnIndex: Integer);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.DeleteInterval');
-  {$endif}
   if AnIndex>IntervalCount-1 then
     raise Exception.Create(RS_E_LIST_INDEX_OUT_OF_BOUNDS)
   else if AnIndex=IntervalCount-1 then
@@ -4016,22 +3535,16 @@ procedure TvpGantt.RemoveInterval(AnInterval: TvpInterval);
 var
   AnIndex: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.RemoveInterval');
-  {$endif}
   AnIndex := FIntervals.IndexOf(AnInterval);
   DeleteInterval(AnIndex);
 end;
 
 procedure TvpGantt.UpdateInterval(AnIndex: Integer = -1);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.UpdateInterval');
-  {$endif}
   //изменяются даты, пересчитаем только в случае если календарь создан
-  if AnIndex>=0 then
-    UpdateBoundDates(TvpInterval(FIntervals[AnIndex]).StartDate,
-                     TvpInterval(FIntervals[AnIndex]).FinishDate);
+  if (AnIndex>=0) AND not FIntervals[AnIndex].Group then
+    UpdateBoundDates(FIntervals[AnIndex].StartDate,
+                     FIntervals[AnIndex].FinishDate);
   VisualChange;
 end;
 
@@ -4039,49 +3552,38 @@ procedure TvpGantt.RecalcIntervals;
 var
   i:integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.RecalcIntervals');
-  {$endif}
   BeginUpdate;
   if IntervalCount>0 then
     for i:=0 to IntervalCount-1 do
-      TvpInterval(FIntervals[i]).UpdateBounds;
+      FIntervals[i].UpdateBounds;
   EndUpdate();
 end;
 
 procedure TvpGantt.Clear;
-var
-  i:integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.Clear');
-  {$endif}
   BeginUpdate;
-  for i:=0 to IntervalCount-1 do
-    TvpInterval(FIntervals[i]).Free;
+  //for i:=0 to IntervalCount-1 do
+  //  TvpInterval(FIntervals[i]).Free;
   FIntervals.Clear;
   FStartDateOfBound := 0;
   FEndDateOfBound := 0;
   UpdateBoundDates(FStartDate, FEndDate);
-  {TODO -o Vas: Подумать о сбросе горизонтального скроллинга в календаре}
-  //if FvpGanttCalendar.HandleAllocated then
-  //  FvpGanttCalendar.FHScrollPosition := 0;
+  //при очистке прокручиваем скроллинг в начало диапазона
+  if FvpGanttCalendar.HandleAllocated then
+    begin
+      FvpGanttCalendar.FHScrollPosition := 0;
+      FvpGanttCalendar.ScrollBarPosition(SB_HORZ, FvpGanttCalendar.FHScrollPosition);
+    end;
   EndUpdate();
 end;
 
 procedure TvpGantt.BeginUpdate;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.BeginUpdate');
-  {$endif}
   Inc(FUpdateCount);
 end;
 
 procedure TvpGantt.EndUpdate(aRefresh: boolean = true);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.EndUpdate');
-  {$endif}
   Dec(FUpdateCount);
   if (FUpdateCount<=0) and aRefresh then
     begin
@@ -4092,50 +3594,32 @@ end;
 
 procedure TvpGantt.First;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.First');
-  {$endif}
   SetFocusRow(0);
 end;
 
 procedure TvpGantt.Last;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.Last');
-  {$endif}
   SetFocusRow(FIntervals.Count-1);
 end;
 
 procedure TvpGantt.MoveTo(ARow: integer);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.MoveTo');
-  {$endif}
   SetFocusRow(ARow);
 end;
 
 function TvpGantt.GetTitleHeight: integer;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.GetTitleHeight');
-  {$endif}
   Result := FMajorScaleHeight + FMinorScaleHeight;
 end;
 
 procedure TvpGantt.HideRowHintWindow;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.HideRowHintWindow');
-  {$endif}
   Hint := FSavedHint;
   Application.CancelHint;
 end;
 
 procedure TvpGantt.DrawCellGrid(ACanvas: TCanvas; const aRect: TRect);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.DrawCellGrid');
-  {$endif}
   //заливаем цветом бордюра
   ACanvas.Brush.Style := bsSolid;
   ACanvas.Brush.Color := FBorderColor;
@@ -4144,9 +3628,6 @@ end;
 
 procedure TvpGantt.DrawCell(aRow: integer; ACanvas: TCanvas; const aRect: TRect);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.DrawCell');
-  {$endif}
   ACanvas.Brush.Style := bsSolid;
   ACanvas.FillRect(aRect);
   if aRow=FFocusRow then
@@ -4158,9 +3639,6 @@ procedure TvpGantt.DrawThemedCell(ACanvas: TCanvas; const aRect: TRect);
 var
   details: TThemedElementDetails;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.DrawThemedCell');
-  {$endif}
   //if gdPushed in aState then
   //  Details := ThemeServices.GetElementDetails(thHeaderItemPressed)
   //else if gdHot in aState then
@@ -4172,20 +3650,12 @@ end;
 
 procedure TvpGantt.DrawFillRect(ACanvas: TCanvas; const aRect: TRect);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.DrawFillRect');
-  {$endif}
   ACanvas.FillRect(aRect);
 end;
 
 procedure TvpGantt.DrawFocusRect(ACanvas: TCanvas; const aRect: TRect);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TGantt.DrawFocusRect');
-  // Draw focused cell if we have the focus
-  Form1.EL.Debug('Focused %d', [Integer(Focused)]);
-  {$endif}
-  //дальше рисуем
+  //рисуем
   if Focused then
     begin
       //если фокус подсвечивать
@@ -4224,9 +3694,6 @@ procedure TvpGantt.DrawHighlightRect(ACanvas: TCanvas; const aRect: TRect);
 var
   aOldBrush: TBrush;
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.DrawHighlightRect');
-  {$endif}
   if vpgRowHighlight in Options then
     begin
       AOldBrush := Canvas.Brush;
@@ -4241,14 +3708,18 @@ end;
 
 procedure TvpGantt.DrawTitleGrid(ACanvas: TCanvas; const aRect: TRect);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.DrawTitleGrid');
-  {$endif}
   if FGridBorderWidth>0 then
     begin
       //не рисуем обводку, если у нас используются стили
+      //в WIN10 будет пустая область, надо залить
       if FTitleStyle = tsNative then
-        Exit;
+        begin
+          ACanvas.Pen.Style := psSolid;
+          ACanvas.Pen.Color := cl3DShadow;
+          ACanvas.MoveTo(aRect.Left, aRect.Bottom - 1);
+          ACanvas.LineTo(aRect.Right, aRect.Bottom - 1);
+          Exit;
+        end;
       ACanvas.Pen.Style := psSolid;
       ACanvas.Pen.Color := cl3DHilight;
       ACanvas.MoveTo(aRect.Right - 1, aRect.Top);
@@ -4272,9 +3743,6 @@ end;
 
 procedure TvpGantt.DrawTitleCell(ACanvas: TCanvas; const aRect: TRect);
 begin
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.DrawTitleCell');
-  {$endif}
   //рисуем бекграунд со стилями
   if FTitleStyle = tsNative then
     DrawThemedCell(ACanvas, aRect)
@@ -4297,10 +3765,7 @@ var
   aBrushStyle: TBrushStyle;
   textWidth: integer;
 begin
-  {DONE: -o Vas Попробовать сделать для первого диапазона не прокручивающуюся надпись  }
-  {$ifdef DBGGANTT}
-  Form1.Debug('TvpGantt.DrawTitleText');
-  {$endif}
+  {DONE: -o Vas Сделать для первого диапазона не прокручивающуюся надпись  }
   //рисуем названия
   aBrushStyle := ACanvas.Brush.Style;
   ACanvas.Brush.Style := bsClear;
@@ -4320,6 +3785,5 @@ begin
   ACanvas.TextRect(textRect, textRect.Left, textRect.Top, aText, aTextStyle);
   ACanvas.Brush.Style := aBrushStyle;
 end;
-
 
 end.

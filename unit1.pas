@@ -5,10 +5,10 @@ unit Unit1;
 interface
 
 uses
-  Classes, SysUtils, FileUtil,
-  Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls, Grids, vpGantt,
-  eventlog, dateutils;
+  Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, StdCtrls,
+  ExtCtrls, Grids, EditBtn, vpGantt, eventlog, dateutils;
 
+{$HINTS OFF}
 type
 
   { TForm1 }
@@ -19,6 +19,7 @@ type
     Button3: TButton;
     ChBStyle: TCheckBox;
     ChBFlat: TCheckBox;
+    DateEdit1: TDateEdit;
     EL: TEventLog;
     Label1: TLabel;
     ListBox1: TListBox;
@@ -28,14 +29,16 @@ type
     Panel3: TPanel;
     Panel4: TPanel;
     Splitter1: TSplitter;
-    StringGrid1: TStringGrid;
     procedure Button1Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
     procedure Button3Click(Sender: TObject);
     procedure ChBFlatChange(Sender: TObject);
     procedure ChBStyleChange(Sender: TObject);
+    procedure DateEdit1AcceptDate(Sender: TObject; var ADate: TDateTime;
+      var AcceptDate: Boolean);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormShow(Sender: TObject);
+    procedure Panel2Click(Sender: TObject);
   private
     { private declarations }
     procedure LogBoundsRect(Control: TControl);
@@ -43,6 +46,8 @@ type
     procedure MDown(Sender: Tobject; Button: TMouseButton; Shift:TShiftState; X,Y:Integer);
     procedure MMove(Sender: Tobject; Shift:TShiftState; X,Y:Integer);
     procedure MUp(Sender: Tobject; Button: TMouseButton; Shift:TShiftState; X,Y:Integer);
+    procedure vpClick(Sender: TObject);
+    procedure vpDblClick(Sender: TObject);
   public
     { public declarations }
     procedure Debug(AMessage: string; AShowMessage: boolean = false);
@@ -52,6 +57,7 @@ type
 var
   Form1: TForm1;
   GanttDiagram: TvpGantt;
+  current: integer;
   //GC: TgsGantt;
 
 implementation
@@ -79,9 +85,7 @@ begin
   Memo1.Lines.Add('Panel4.ClientREct.Width ' + IntToStr(Panel4.ClientREct.Width));
   Memo1.Lines.Add('Panel4.ClientREct.HEight ' + IntToStr(Panel4.ClientREct.Height));
 
-  StringGrid1.GridLineWidth := StringGrid1.GridLineWidth +1;
-  Memo1.Lines.Add('StringGrid1.GridLineWidth ' + IntToStr(StringGrid1.GridLineWidth));
-
+  GanttDiagram.ScrollToCurTime;
 end;
 
 procedure TForm1.Button2Click(Sender: TObject);
@@ -91,13 +95,17 @@ var
   GInterval: TvpInterval;
 begin
   GanttDiagram.BeginUpdate;
-  for i:=0 to 50 do
+  for i:=current to current+10 do
     begin
       GInterval := TvpInterval.Create(GanttDiagram);
       GInterval.Name := 'Наряд №' + IntToStr(i) + ' от ' + DateToStr(Now-10+i);
-      GInterval.StartDate := Now - 4 + i;
-      Memo1.Lines.Add(DatetImeToStr(GInterval.StartDate));
-      GInterval.Duration := 10;
+      if i = current then
+        GInterval.Group := true
+      else
+        begin
+          GInterval.StartDate := Now - 4 + i;
+          GInterval.Duration := 10;
+        end;
       if i = 4 then
         GInterval.FinishDate := GInterval.StartDate + 4;
       if i = 6 then
@@ -109,8 +117,8 @@ begin
       //GInterval.Visible := True;
       GanttDiagram.AddInterval(GInterval);
     end;
-  GanttDiagram.First;
   GanttDiagram.EndUpdate();
+  current := i+1;
 end;
 
 procedure TForm1.Button3Click(Sender: TObject);
@@ -132,6 +140,14 @@ begin
   LogClientRect(GanttDiagram);
 end;
 
+procedure TForm1.DateEdit1AcceptDate(Sender: TObject; var ADate: TDateTime;
+  var AcceptDate: Boolean);
+begin
+  GanttDiagram.Clear;
+  GanttDiagram.StartDate := DateEdit1.Date;
+  GanttDiagram.EndDate := DateEdit1.Date;
+end;
+
 procedure TForm1.FormClose(Sender: TObject; var CloseAction: TCloseAction);
 begin
   try
@@ -144,6 +160,7 @@ end;
 procedure TForm1.FormShow(Sender: TObject);
 begin
   EL.Active := True;
+  current := 0;
 
   GanttDiagram := TvpGantt.Create(Self);
   GanttDiagram.Parent := Panel3;
@@ -151,16 +168,19 @@ begin
   GanttDiagram.ScrollBars := ssAutoBoth;
   GanttDiagram.BorderStyle := bsSingle;
   GanttDiagram.TaskTitleCaption := 'Наряды';
-  GanttDiagram.MajorScale := vptsMonth;
-  GanttDiagram.MinorScale := vptsDay;
+  GanttDiagram.MinorScale := vptsHour;
+  GanttDiagram.MajorScale := vptsDay;
   GanttDiagram.TitleStyle := tsNative;
   GanttDiagram.GridBorderWidth := 1;
   GanttDiagram.Hint := 'Это стандартный скрипт';
   //Debug(Format('TForm1.FormShow RowHeight %d', [GanttDiagram.RowHeight]));
   GanttDiagram.SetFocus;
-  //GanttDiagram.OnMouseDown := @MDown;
-  //GanttDiagram.OnMouseMove := @MMove;
-  //GanttDiagram.OnMouseUp := @MUp;
+  GanttDiagram.OnMouseDown := @MDown;
+  GanttDiagram.OnMouseMove := @MMove;
+  GanttDiagram.OnMouseUp := @MUp;
+  GanttDiagram.OnDblClick := @vpDblClick;
+  //GanttDiagram.OnClick := @vpClick;
+  //StringGrid1.OnClick := @vpClick;
 
   //GC :=  TgsGantt.Create(Self);
   //GC.Parent := Self;
@@ -190,6 +210,11 @@ begin
   //        GC.Interval[i].AddInterval(LInterval);
   //      end;
   //  end;
+end;
+
+procedure TForm1.Panel2Click(Sender: TObject);
+begin
+  ShowMessage('PanelClick');
 end;
 
 procedure TForm1.Debug(AMessage: string; AShowMessage: boolean);
@@ -236,5 +261,19 @@ begin
   Memo1.Lines.Add('OnMouseUp ' + Format('x %d y %d',[X, Y]));
 end;
 
+procedure TForm1.vpClick(Sender: TObject);
+begin
+  ShowMessage('Click');
+end;
+
+procedure TForm1.vpDblClick(Sender: TObject);
+var
+  curIndex: integer;
+begin
+  curIndex := GanttDiagram.SelectedIndex;
+  Memo1.Lines.Add(IntToStr(curIndex));
+end;
+
+{$HINTS ON}
 end.
 
